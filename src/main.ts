@@ -6,7 +6,6 @@ g.server({
   variables: {
     _init: false,
     ballVx: 0.0,
-    ballVy: 0.0,
     ballVz: 0.0,
     tickCount: 0n,
     lastKickTick: 0n
@@ -27,7 +26,7 @@ g.server({
     f.设置节点图变量自动类型推断('tickCount', tc)
 
     // 2. 查找足球和角色
-    let balls = f.获取场上指定元件ID的实体(prefabId(1077936220))
+    let balls = f.获取场上指定元件ID的实体(prefabId(1077936262))
     let char = self
 
     // 3. 读取角色位置、前方向量、速度
@@ -42,12 +41,10 @@ g.server({
     let ballLocRot = f.获取实体位置与旋转(ball)
     let ballPos = ballLocRot.location
 
-    // 5. 摩擦力衰减（先于踢球）
+    // 5. 摩擦力衰减（先于踢球），仅 XZ 平面
     let storedVx = f.获取节点图变量自动类型推断('ballVx')
-    let storedVy = f.获取节点图变量自动类型推断('ballVy')
     let storedVz = f.获取节点图变量自动类型推断('ballVz')
     storedVx = storedVx * 0.95
-    storedVy = storedVy * 0.95
     storedVz = storedVz * 0.95
 
     // 计算方向向量
@@ -61,7 +58,6 @@ g.server({
     let canKick = bool(tickSinceKick >= 3n && distSq < 2.25 && forwardDotBall > -0.3)
 
     let finalVx = storedVx
-    let finalVy = storedVy
     let finalVz = storedVz
 
     if (canKick) {
@@ -107,22 +103,20 @@ g.server({
       let kickSpeed = baseForce * weight * coeff
       let kickVel = f.三维向量缩放(kickDir, kickSpeed)
 
-      let prevVel = f.创建三维向量(storedVx, storedVy, storedVz)
+      let prevVel = f.创建三维向量(storedVx, 0.0, storedVz)
       let newVel = f.三维向量加法(prevVel, kickVel)
 
       let velComps = f.拆分三维向量(newVel)
       finalVx = velComps.xComponent
-      finalVy = velComps.yComponent
       finalVz = velComps.zComponent
     }
 
-    // 8. 写回 ballVelocity
+    // 8. 写回 ballVelocity（仅 XZ 平面）
     f.设置节点图变量自动类型推断('ballVx', finalVx)
-    f.设置节点图变量自动类型推断('ballVy', finalVy)
     f.设置节点图变量自动类型推断('ballVz', finalVz)
 
     // 9. 施加运动器件
-    let finalVel = f.创建三维向量(finalVx, finalVy, finalVz)
+    let finalVel = f.创建三维向量(finalVx, 0.0, finalVz)
     f.添加匀速直线型基础运动器(ball, 'dribbleCtrl', 0.12, finalVel)
     f.设置自定义变量(ball, '速度', finalVel)
   })

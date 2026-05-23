@@ -81,3 +81,48 @@ If something is wrong, compare `.gs.ts` and `.json` first. Outputs are in `dist/
 
 ## Looking Up Functions
 Search `node_modules/genshin-ts/dist/src/definitions/` with keywords (event name, function name, Chinese alias).
+中文别名完整映射在 `node_modules/genshin-ts/src/definitions/zh_aliases.ts`。
+
+## 实战经验（从首次实现中总结）
+
+### 节点图函数全部是 `f` 的方法
+所有 node graph 函数（如 `获取实体位置与旋转`、`三维向量减法` 等）都是 `f` 的方法，不是全局函数。
+全局 helper（`self`、`bool()`、`prefabId()`、`vec3()`、`setInterval` 等）是例外。
+
+### 创建三维向量：用 `f.创建三维向量(x, y, z)` 而非 `vec3([x,y,z])`
+`vec3()` 全局函数只接受 `Vec3Value` 字面量，不接受运行时 float 变量。
+从 float 变量构建 vec3 必须用 `f.创建三维向量(x, y, z)`，拆分用 `f.拆分三维向量(v)`。
+
+### 高频 tick 用编辑器定时器，不用 `setInterval`
+```ts
+.on('实体创建时', (_evt, f) => {
+  f.启动定时器(self, 'run', true, [0.12])  // 注册，参数为数组
+}).on('定时器触发时', (_evt, f) => {
+  // 每 120ms 执行的逻辑
+})
+```
+`f.启动定时器` 的第四个参数是 `[间隔秒数]` 数组。
+
+### 角色朝向的正确取法
+`f.获取实体向前向量(e)` 返回世界空间前向，不是角色的实际面朝方向。
+正确做法是用实体欧拉角旋转基础前向：
+```ts
+let charLocRot = f.获取实体位置与旋转(char)
+let charForward = f.三维向量旋转(charLocRot.rotate, f.创建三维向量(0.0, 0.0, 1.0))
+```
+`charLocRot.rotate` 是欧拉角，`[0,0,1]` 是 Z 轴正方向（默认前向）。
+
+### WSL 环境注入
+WSL 下需手动设置 Windows 路径环境变量：
+```bash
+export LOCALAPPDATA=/mnt/c/Users/<用户名>/AppData/Local
+```
+已写入 `~/.bashrc`。
+
+### 编译验证流程
+```bash
+npm run typecheck  # 先过类型
+npm run lint       # 再过 ESLint
+npm run build      # 编译 + GIA + 注入
+```
+检查 `dist/src/main.gs.ts` 确认代码正确展开为节点函数调用。
