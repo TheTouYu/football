@@ -1,5 +1,10 @@
 import { g } from 'genshin-ts/runtime/core'
 
+import { gstsServer计算力系数, gstsServer计算对齐权重, gstsServer计算踢球方向权重 } from './kick'
+import { gstsServer判断运动状态, gstsServer计算前向, gstsServer计算旋转轴方向 } from './motion'
+
+// === 主入口 ===
+
 g.server({
   id: 1073742432,
   lang: 'zh',
@@ -8,7 +13,14 @@ g.server({
     ballVx: 0.0,
     ballVz: 0.0,
     tickCount: 0n,
-    lastKickTick: 0n
+    lastKickTick: 0n,
+    ballState: 0n,
+    frictionDecay: 0.75,
+    ballRadius: 0.45,
+    kickCooldown: 1n,
+    kickRangeSq: 3.25,
+    speedMultiplier: 1.4,
+    minKickForce: 2.0
   }
 })
   .on('实体创建时', (_evt, f) => {
@@ -32,20 +44,22 @@ g.server({
     // 3. 读取角色位置、前方向量、速度
     let charLocRot = f.获取实体位置与旋转(char)
     let charPos = charLocRot.location
-    let charForward = f.三维向量旋转(charLocRot.rotate, f.创建三维向量(0.0, 0.0, 1.0))
+    let charForward = gstsServer计算前向(charLocRot.rotate)
     let charSpeedInfo = f.查询角色当前移动速度(char)
     let charSpeed = charSpeedInfo.currentSpeed
 
-    // 4. 读取足球位置
+    // 4. 读取足球位置和旋转
     let ball = balls[0]
     let ballLocRot = f.获取实体位置与旋转(ball)
     let ballPos = ballLocRot.location
+    let ballRotate = ballLocRot.rotate
 
     // 5. 摩擦力衰减（先于踢球），仅 XZ 平面
     let storedVx = f.获取节点图变量自动类型推断('ballVx')
     let storedVz = f.获取节点图变量自动类型推断('ballVz')
-    storedVx = storedVx * 0.95
-    storedVz = storedVz * 0.95
+    let frictionDecay = f.获取节点图变量自动类型推断('frictionDecay')
+    storedVx = storedVx * frictionDecay
+    storedVz = storedVz * frictionDecay
 
     // 计算方向向量
     let toBall = f.三维向量减法(ballPos, charPos)
@@ -55,7 +69,11 @@ g.server({
 
     // 6. 踢球决策
     let tickSinceKick = tc - f.获取节点图变量自动类型推断('lastKickTick')
-    let canKick = bool(tickSinceKick >= 3n && distSq < 2.25 && forwardDotBall > -0.3)
+    let kickCooldown = f.获取节点图变量自动类型推断('kickCooldown')
+    let kickRangeSq = f.获取节点图变量自动类型推断('kickRangeSq')
+    let canKick = bool(
+      tickSinceKick >= kickCooldown && distSq < kickRangeSq && forwardDotBall > -0.3
+    )
 
     let finalVx = storedVx
     let finalVz = storedVz
@@ -63,41 +81,24 @@ g.server({
     if (canKick) {
       f.设置节点图变量自动类型推断('lastKickTick', tc)
 
-      // 踢球方向: normalize(0.7 * charForward + 0.3 * toBallDir)
-      let scaledForward = f.三维向量缩放(charForward, 0.7)
-      let scaledToBall = f.三维向量缩放(toBallDir, 0.3)
+      // 踢球方向: forwardWeight * forward + (1-forwardWeight) * toBallDir
+      let fw = gstsServer计算踢球方向权重(forwardDotBall)
+      let tbw = 1.0 - fw
+      let scaledForward = f.三维向量缩放(charForward, fw)
+      let scaledToBall = f.三维向量缩放(toBallDir, tbw)
       let rawDir = f.三维向量加法(scaledForward, scaledToBall)
       let kickDir = f.三维向量归一化(rawDir)
 
-      // 基础力: max(charSpeed * 1.2, 3.0)
-      let baseForce = charSpeed * 1.2
-      if (bool(baseForce < 3.0)) {
-        baseForce = 3.0
+      // 基础力: max(charSpeed * speedMultiplier, minKickForce)
+      let speedMultiplier = f.获取节点图变量自动类型推断('speedMultiplier')
+      let minKickForce = f.获取节点图变量自动类型推断('minKickForce')
+      let baseForce = charSpeed * speedMultiplier
+      if (bool(baseForce < minKickForce)) {
+        baseForce = minKickForce
       }
 
-      // 对齐权重: 分段线性
-      let weight = 0.1
-      if (bool(forwardDotBall > 0.9)) {
-        weight = 1.2
-      }
-      if (bool(forwardDotBall > 0.5 && forwardDotBall <= 0.9)) {
-        weight = 1.0
-      }
-      if (bool(forwardDotBall > 0.0 && forwardDotBall <= 0.5)) {
-        weight = 0.5
-      }
-      if (bool(forwardDotBall > -0.5 && forwardDotBall <= 0.0)) {
-        weight = 0.2
-      }
-
-      // 力系数: 轻推0.3 / 修正1.2 / 正常0.8
-      let coeff = 0.3
-      if (bool(forwardDotBall > 0.9)) {
-        coeff = 0.8
-      }
-      if (bool(forwardDotBall > 0.0 && forwardDotBall <= 0.9)) {
-        coeff = 1.2
-      }
+      let weight = gstsServer计算对齐权重(forwardDotBall)
+      let coeff = gstsServer计算力系数(forwardDotBall)
 
       // 7. 叠加踢球速度
       let kickSpeed = baseForce * weight * coeff
@@ -111,12 +112,31 @@ g.server({
       finalVz = velComps.zComponent
     }
 
-    // 8. 写回 ballVelocity（仅 XZ 平面）
+    // 8. 写回 ballVelocity
     f.设置节点图变量自动类型推断('ballVx', finalVx)
     f.设置节点图变量自动类型推断('ballVz', finalVz)
 
-    // 9. 施加运动器件
+    // 9. 运动状态判定
     let finalVel = f.创建三维向量(finalVx, 0.0, finalVz)
-    f.添加匀速直线型基础运动器(ball, 'dribbleCtrl', 0.12, finalVel)
+    let speed = f.三维向量模运算(finalVel)
+    let currentState = f.获取节点图变量自动类型推断('ballState')
+    let newState = gstsServer判断运动状态(speed, currentState)
+    f.设置节点图变量自动类型推断('ballState', newState)
+
+    // 10. 施加运动器件（静止时跳过以节省性能）
+    if (bool(speed >= 0.1)) {
+      f.添加匀速直线型基础运动器(ball, 'dribbleCtrl', 0.24, finalVel)
+
+      // 仅滚动状态施加角速度
+      if (bool(newState == 1n)) {
+        // 角速度 = 线速度 / 半径
+        let ballRadius = f.获取节点图变量自动类型推断('ballRadius')
+        const angularSpeed = ((speed / ballRadius) * 180) / 3.1415926
+        const rotationAxis = gstsServer计算旋转轴方向(finalVel, ballRotate)
+        f.添加匀速旋转型基础运动器(ball, 'dribbleRot', 0.24, angularSpeed, rotationAxis)
+      }
+    }
+
     f.设置自定义变量(ball, '速度', finalVel)
+    f.设置自定义变量(ball, '状态', newState)
   })
