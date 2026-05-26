@@ -23,7 +23,7 @@ Docs: `https://gsts.moe`
 ## Injection Config Example (Optional)
 
 ```ts
-import type { GstsConfig } from 'genshin-ts'
+import type { GstsConfig } from 'genshin-ts-touyu'
 
 const config: GstsConfig = {
   compileRoot: '.',
@@ -64,7 +64,7 @@ Language entry:
 ## Entry and Event Style
 
 ```ts
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 g.server({ id: 1073741825 }).on('whenEntityIsCreated', (evt, f) => {
   const p = player(1)
@@ -143,7 +143,7 @@ Disable an option temporarily if you need to debug or compare graphs.
 - Use `bigint` for modulo/bitwise operations.
 - When list indexing uses `bigint` / `IntValue`, wrap with `idx(...)`, e.g. `arr[idx(i)]` (you can apply this via ESLint auto-fix).
 - If this is shown as a warning (not an error), the TypeScript plugin is usually active and already treats `bigint` as a valid index value; you may disable `gsts/bigint-index-in-server`.
-- If `TS2538` still appears as an error in VSCode/Cursor, configure `"typescript.tsdk": "node_modules/typescript/lib"` and `"typescript.enablePromptUseWorkspaceTsdk": true` (the genshin-ts project template already includes these settings), then switch to the workspace TypeScript version.
+- If `TS2538` still appears as an error in VSCode/Cursor, configure `"typescript.tsdk": "node_modules/typescript/lib"` and `"typescript.enablePromptUseWorkspaceTsdk": true` (the genshin-ts-touyu project template already includes these settings), then switch to the workspace TypeScript version.
 - Lists/dicts must be homogeneous; mixed types will fail.
 - Empty arrays may not infer a type; add a typed placeholder or use `list(...)`.
 - Prefer explicit helpers: `int`, `float`, `vec3`, `configId`, `prefabId`, `entity`, etc.
@@ -282,6 +282,6 @@ Notes:
 
 ## Looking Up Function Notes (AI Friendly)
 
-When type hints are not enough, search in `node_modules/genshin-ts`:
-- Node functions and event definitions: `node_modules/genshin-ts/dist/src/definitions/`
+When type hints are not enough, search in `node_modules/genshin-ts-touyu`:
+- Node functions and event definitions: `node_modules/genshin-ts-touyu/dist/src/definitions/`
 - Use keywords (event name, function name, Chinese alias) to locate comments and params.

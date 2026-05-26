@@ -17,4 +17,4 @@ This is a Genshin-TS project. See `CLAUDE.md` for the full AI guidance.
 - Prefer implementing gameplay logic in code; do not assume editor-authored resources already exist.
 - Separate every feature into: code changes + editor setup required.
 - When responding in Chinese, prefer terminology from `README_ZH.md` and `docs/EDITOR_BOUNDARIES_ZH.md`.
-- For function/event reference, search `node_modules/genshin-ts/dist/src/definitions/`.
+- For function/event reference, search `node_modules/genshin-ts-touyu/dist/src/definitions/`.

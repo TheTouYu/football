@@ -1,6 +1,6 @@
 # new_foot
 
-这是一个基于 genshin-ts 的千星奇域项目模板。你可以用 TypeScript 写逻辑，编译为节点图并注入到地图。
+这是一个基于 genshin-ts-touyu 的千星奇域项目模板。你可以用 TypeScript 写逻辑，编译为节点图并注入到地图。
 
 ## 快速开始
 
@@ -23,7 +23,7 @@ npm run dev
 ## 注入配置示例（可选）
 
 ```ts
-import type { GstsConfig } from 'genshin-ts'
+import type { GstsConfig } from 'genshin-ts-touyu'
 
 const config: GstsConfig = {
   compileRoot: '.',
@@ -65,7 +65,7 @@ export default config
 ## 入口与事件写法
 
 ```ts
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 g.server({ id: 1073741825 }).on('whenEntityIsCreated', (evt, f) => {
   const p = player(1)
@@ -148,7 +148,7 @@ g.server({
 - 取余、位运算等整数运算请使用 `bigint`。
 - 列表下标若使用 `bigint` / `IntValue`，请用 `idx(...)` 包裹，例如 `arr[idx(i)]`（可直接应用 ESLint 自动修复）。
 - 若此处显示为“警告”而非“错误”，通常表示项目 TypeScript 插件已生效（已将 `bigint` 视作可索引），可按需禁用 `gsts/bigint-index-in-server`。
-- 若 VSCode/Cursor 里仍看到 `TS2538` 错误，请配置 `"typescript.tsdk": "node_modules/typescript/lib"` 与 `"typescript.enablePromptUseWorkspaceTsdk": true`（genshin-ts 的项目模板已经自带这些设置），并设置“使用工作区 TypeScript 版本”。
+- 若 VSCode/Cursor 里仍看到 `TS2538` 错误，请配置 `"typescript.tsdk": "node_modules/typescript/lib"` 与 `"typescript.enablePromptUseWorkspaceTsdk": true`（genshin-ts-touyu 的项目模板已经自带这些设置），并设置“使用工作区 TypeScript 版本”。
 - 列表/字典元素类型必须一致，混合类型会报错。
 - 空数组可能无法推断类型，建议先放一个同类型占位值。
 - 建议使用辅助函数明确类型：`int`、`float`、`vec3`、`configId`、`prefabId`、`entity` 等。
@@ -296,7 +296,7 @@ g.server({ id: 1073741825 }).on('whenEntityIsCreated', (evt, f) => {
 
 ## 需要查函数说明时（AI 可用）
 
-当类型提示不足时，可以直接在 `node_modules/genshin-ts` 中搜索函数/事件注释：
+当类型提示不足时，可以直接在 `node_modules/genshin-ts-touyu` 中搜索函数/事件注释：
 
-- 节点函数与事件定义：`node_modules/genshin-ts/dist/src/definitions/`
+- 节点函数与事件定义：`node_modules/genshin-ts-touyu/dist/src/definitions/`
 - 建议用关键词搜索（事件名、函数名、中文别名）定位注释与参数说明。

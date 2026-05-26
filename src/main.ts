@@ -1,4 +1,4 @@
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 import { gstsServer计算前向 } from './motion'
 

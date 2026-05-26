@@ -1,4 +1,4 @@
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 // === 滑动图 1073742435 (足球实体) ===
 // 地面摩擦 + 直线运动器（无旋转）

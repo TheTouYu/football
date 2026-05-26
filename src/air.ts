@@ -1,4 +1,4 @@
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 import { gstsServer计算旋转轴方向 } from './motion'
 
@@ -42,12 +42,13 @@ g.server({
     ballVy = ballVy - gravity * 0.12
     ballY = ballY + ballVy * 0.12
 
+    // 两分支共用 XZ 速度计算（着陆判状态 / 空中算角速度）
+    let xzSpeed = f.三维向量模运算(f.创建三维向量(ballVx, 0.0, ballVz))
+
     if (bool(ballY <= 0.45)) {
       f.设置自定义变量(self, 'ballVy', 0.0)
       f.设置自定义变量(self, 'ballY', 0.45)
 
-      let xzVel = f.创建三维向量(ballVx, 0.0, ballVz)
-      let xzSpeed = f.三维向量模运算(xzVel)
       let nextState = 1n
       if (bool(xzSpeed < 0.5)) {
         nextState = 0n
@@ -65,8 +66,6 @@ g.server({
     let ballLocRot = f.获取实体位置与旋转(self)
     // @ts-expect-error generic → float via dataTypeConversion
     let ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
-    let xzVel2 = f.创建三维向量(ballVx, 0.0, ballVz)
-    let xzSpeed = f.三维向量模运算(xzVel2)
     let angularSpeed = ((xzSpeed / ballRadius) * 180) / 3.1415926
     let rotationAxis = gstsServer计算旋转轴方向(finalVel, ballLocRot.rotate)
     f.添加匀速旋转型基础运动器(self, 'dribbleRot', 0.24, angularSpeed, rotationAxis)

@@ -1,4 +1,4 @@
-import type { GstsConfig } from 'genshin-ts'
+import type { GstsConfig } from 'genshin-ts-touyu'
 
 const config: GstsConfig = {
   compileRoot: '.',

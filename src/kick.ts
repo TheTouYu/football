@@ -1,4 +1,4 @@
-import { g } from 'genshin-ts/runtime/core'
+import { g } from 'genshin-ts-touyu/runtime/core'
 
 import {
   gstsServer计算力系数,
@@ -7,6 +7,7 @@ import {
 } from './kick_weights'
 
 // === 踢球图 1073742437 (角色实体) ===
+// 踢球力学：读取角色/足球信息 → 计算方向与力 → 叠加冲量 → 判定后续运动状态
 
 g.server({
   id: 1073742437,

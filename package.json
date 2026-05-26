@@ -12,11 +12,11 @@
     "backup": "gsts open backup"
   },
   "dependencies": {
-    "genshin-ts": "latest"
+    "genshin-ts-touyu": "latest"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
     "@ianvs/prettier-plugin-sort-imports": "^4.3.1",
+    "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
     "eslint": "^9.39.1",

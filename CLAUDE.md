@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `docs/EDITOR_BOUNDARIES.md`: English decision rules for code-vs-editor responsibilities.
 
 ## Project Overview
-This is a Genshin-TS project — TypeScript compiles to node graphs (`.gia`) injected into Genshin UGC maps (千星奇域). The compiler is in `node_modules/genshin-ts`.
+This is a Genshin-TS project — TypeScript compiles to node graphs (`.gia`) injected into Genshin UGC maps (千星奇域). The compiler is in `node_modules/genshin-ts-touyu`.
 
 **中文编程环境**：本项目配置了 `lang: 'zh'`，代码中使用中文事件名、中文函数别名。写代码时优先使用中文术语，参考 `README_ZH.md` 和 `docs/EDITOR_BOUNDARIES_ZH.md` 中的用词。与用户沟通使用简体中文。
 
@@ -80,8 +80,8 @@ If something is wrong, compare `.gs.ts` and `.json` first. Outputs are in `dist/
 - Entries with same `id` auto-merge.
 
 ## Looking Up Functions
-Search `node_modules/genshin-ts/dist/src/definitions/` with keywords (event name, function name, Chinese alias).
-中文别名完整映射在 `node_modules/genshin-ts/src/definitions/zh_aliases.ts`。
+Search `node_modules/genshin-ts-touyu/dist/src/definitions/` with keywords (event name, function name, Chinese alias).
+中文别名完整映射在 `node_modules/genshin-ts-touyu/src/definitions/zh_aliases.ts`。
 
 ## 实战经验（从首次实现中总结）
 
