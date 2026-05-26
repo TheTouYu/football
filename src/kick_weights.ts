@@ -41,3 +41,29 @@ export function gstsServer计算力系数(dot: number) {
   }
   return coeff
 }
+
+// === 踢球条件判定 ===
+
+/**
+ * 判断某个角色是否可以踢球
+ * 独立成函数，后续可改为按键触发等方式（不依赖位置）
+ */
+
+export function gstsServer满足踢球条件(
+  ballState: bigint,
+  charPos: any,
+  ballPos: any,
+  kickRange: any
+): boolean {
+  let result = true
+  // 条件：球不在锁定状态 && 距离在踢球范围内
+  if (bool(ballState == 5n)) {
+    result = false
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  let dist = gsts.f._3dVectorModuloOperation(gsts.f._3dVectorSubtraction(ballPos, charPos))
+  if (bool(dist >= kickRange)) {
+    result = false
+  }
+  return result
+}

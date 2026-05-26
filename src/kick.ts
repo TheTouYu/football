@@ -5,6 +5,7 @@ import {
   gstsServer计算对齐权重,
   gstsServer计算踢球方向权重
 } from './kick_weights'
+import { gstsServer判定目标状态 } from './motion'
 
 // === 踢球图 1073742437 (角色实体) ===
 // 踢球力学：读取角色/足球信息 → 计算方向与力 → 叠加冲量 → 判定后续运动状态
@@ -32,11 +33,8 @@ g.server({
   let ballPos = ballLocRot.location
 
   // 3. 读球速度
-  // @ts-expect-error generic → float via dataTypeConversion
   let ballVx = f.数据类型转换(f.获取自定义变量(ball, 'ballVx'), 'float')
-  // @ts-expect-error generic → float via dataTypeConversion
   let ballVz = f.数据类型转换(f.获取自定义变量(ball, 'ballVz'), 'float')
-  // @ts-expect-error generic → float via dataTypeConversion
   let ballVy = f.数据类型转换(f.获取自定义变量(ball, 'ballVy'), 'float')
 
   // 4. 距离与方向
@@ -54,9 +52,7 @@ g.server({
   let kickDir = f.三维向量归一化(rawDir)
 
   // 6. 基础力
-  // @ts-expect-error generic → float via dataTypeConversion
   let speedMultiplier = f.数据类型转换(f.获取自定义变量(ball, 'speedMultiplier'), 'float')
-  // @ts-expect-error generic → float via dataTypeConversion
   let minKickForce = f.数据类型转换(f.获取自定义变量(ball, 'minKickForce'), 'float')
   let baseForce = charSpeed * speedMultiplier
   if (bool(baseForce < minKickForce)) {
@@ -66,7 +62,6 @@ g.server({
   // 7. 力计算 + 距离衰减
   let weight = gstsServer计算对齐权重(forwardDotBall)
   let coeff = gstsServer计算力系数(forwardDotBall)
-  // @ts-expect-error generic → float via dataTypeConversion
   let distDecayStrength = f.数据类型转换(f.获取自定义变量(ball, 'distDecayStrength'), 'float')
   let distFactor = 1.0 / (1.0 + distSq * distDecayStrength)
   let kickSpeed = baseForce * weight * coeff * distFactor
@@ -80,13 +75,10 @@ g.server({
   let finalVz = velComps.zComponent
 
   // 9. 首次踢球弹跳
-  // @ts-expect-error generic → bool via dataTypeConversion
   let hasKicked = f.数据类型转换(f.获取自定义变量(ball, 'hasKicked'), 'bool')
   if (bool(!hasKicked)) {
     f.设置自定义变量(ball, 'hasKicked', true)
-    // @ts-expect-error generic → float via dataTypeConversion
     let bounceVelMin = f.数据类型转换(f.获取自定义变量(ball, 'bounceVelMin'), 'float')
-    // @ts-expect-error generic → float via dataTypeConversion
     let bounceVelMax = f.数据类型转换(f.获取自定义变量(ball, 'bounceVelMax'), 'float')
     ballVy = f.获取随机浮点数(bounceVelMin, bounceVelMax)
   }
@@ -96,18 +88,8 @@ g.server({
   f.设置自定义变量(ball, 'ballVz', finalVz)
   f.设置自定义变量(ball, 'ballVy', ballVy)
 
-  // 11. 判定后续状态
-  let xzVel = f.创建三维向量(finalVx, 0.0, finalVz)
-  let xzSpeed = f.三维向量模运算(xzVel)
-  let nextState = 1n
-  if (bool(xzSpeed < 0.5)) {
-    nextState = 0n
-  }
-  if (bool(xzSpeed >= 7.0)) {
-    nextState = 2n
-  }
-  if (bool(ballVy > 0.0)) {
-    nextState = 3n
-  }
+  // 11. 判定后续状态（用共享函数）
+  let xzSpeed = f.三维向量模运算(f.创建三维向量(finalVx, 0.0, finalVz))
+  let nextState = gstsServer判定目标状态(xzSpeed, ballVy)
   f.设置自定义变量(ball, '状态', nextState, true)
 })

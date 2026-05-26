@@ -12,7 +12,7 @@
     "backup": "gsts open backup"
   },
   "dependencies": {
-    "genshin-ts-touyu": "latest"
+    "genshin-ts-touyu": "^0.2.5"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.3.1",

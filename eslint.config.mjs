@@ -1,1 +1,1 @@
-export { default } from 'genshin-ts/configs/eslint/full.mjs'
+export { default } from 'genshin-ts-touyu/configs/eslint/full.mjs'
