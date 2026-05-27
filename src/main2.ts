@@ -76,8 +76,8 @@ g.server({
     f.启动定时器(self, 'motionTick', true, [0.12])
   })
   .on('定时器触发时', (evt, f) => {
-    // 只处理 motionTick 事件
-    if (bool(evt.timerName != 'motionTick')) {
+    // 只处理 motionTick（正常循环）和 debugStepTick（调试单步）事件
+    if (bool(evt.timerName != 'motionTick' && evt.timerName != 'debugStepTick')) {
       return
     }
 
@@ -205,11 +205,6 @@ g.server({
     }
 
     // 注意：不在此处调用 doXxx() — 物理执行由 Graph 2 负责
-
-    // 重新拉起 motionTick 循环定时器
-    // 关键：Ball_Debug视觉可能将 motionTick 替换为一次性定时器以触发即时 tick
-    //       此处确保每次 tick 后循环定时器持续运行
-    f.启动定时器(self, 'motionTick', true, [0.12])
   })
 
 // ============================================================
@@ -415,11 +410,14 @@ g.server({
 
 // ============================================================
 // Graph 5: Ball_Debug视觉 (ID 1073742444, 挂载足球实体)
-// 职责：监听 debug 自定义变量变化 → 触发一次即时 motionTick
-//       用户通过 f.设置自定义变量(self, '_debugFlash0', <任意值>, true) 触发
-//       原理：将 motionTick 定时器替换为 0.01s 一次性定时器
-//             → 立即走一轮 Ball_主控的 tick handler
-//             → tick handler 末尾重新拉起 0.12s 循环定时器
+// 职责：调试单步执行 — 暂停/恢复定时器 + 逐帧步进
+//
+//  _debugFlash0 变化 → 暂停循环 → 触发一步（走一轮状态机）
+//  _debugFlash1 变化 → 恢复循环定时器（回到正常 120ms 运行）
+//
+// 用户用法：
+//   f.设置自定义变量(self, '_debugFlash0', 1.0, true)  // 步进一次
+//   f.设置自定义变量(self, '_debugFlash1', 1.0, true)  // 恢复运行
 // ============================================================
 
 g.server({
@@ -435,10 +433,17 @@ g.server({
       return
     }
 
-    // 触发一次即时 motionTick：
-    // 将 motionTick 定时器替换为 0.01s 一次性定时器
-    // 同名定时器会覆盖旧定时器 → 原 0.12s 循环定时器被替换
-    // 0.01s 后 motionTick 触发 → Ball_主控运行一轮状态机
-    // Ball_主控的 tick handler 末尾会重新拉起 0.12s 循环定时器
-    f.启动定时器(self, 'motionTick', false, [0.01])
+    if (bool(evt.variableName == '_debugFlash0')) {
+      // == 步进模式 ==
+      // 1. 暂停循环定时器（停止自动运行）
+      f.暂停定时器(self, 'motionTick')
+      // 2. 启动一次性 debugStepTick（0.01s 后触发）
+      //    Ball_主控的定时器 handler 同时响应 motionTick 和 debugStepTick
+      //    debugStepTick 触发一轮状态机后自动结束，不会重启
+      f.启动定时器(self, 'debugStepTick', false, [0.01])
+    } else {
+      // == 恢复模式 ==
+      // 恢复被暂停的循环定时器
+      f.恢复定时器(self, 'motionTick')
+    }
   })
