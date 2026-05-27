@@ -4,6 +4,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 // ↑ f: any 是 genshin-ts 标准模式，中文函数名无 TS 类型声明；所有赋值来自 any 类型 API 返回值
 
+import { log } from './logger'
+
 // ============================================================
 // 内部辅助函数
 // ============================================================
@@ -285,7 +287,7 @@ export function doLock(f: any, lockerEntity: any): void {
     f.设置自定义变量(self, 'ballVx', kickVx, true)
     f.设置自定义变量(self, 'ballVz', kickVz, true)
 
-    f.发送信号('日志操作', '锁定' as any, f.拼装列表(['LOCK初始踢球 V=7.5']) as any)
+    log(f, '锁定', ['LOCK初始踢球 V=7.5'])
   } else {
     // 3. 球已在运动中：摩擦衰减 + 计算与锁定者的距离
 

@@ -5,6 +5,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 // ↑ f: any 是 genshin-ts 标准模式，中文函数名无 TS 类型声明
 
+import { log } from './logger'
+
 // ============================================================
 // 碰撞半径常量
 // ============================================================
@@ -121,7 +123,7 @@ export function checkPlayerCollision(f: any, playerEntity: any): boolean {
     f.设置自定义变量(ball, 'ballVy', velComps.yComponent)
     f.设置自定义变量(ball, 'ballVz', velComps.zComponent)
 
-    f.发送信号('日志操作', '物理' as any, f.拼装列表(['球员碰撞 反射(Vx=', str(velComps.xComponent), ' Vy=', str(velComps.yComponent), ' Vz=', str(velComps.zComponent), ')']) as any)
+    log(f, '物理', ['球员碰撞 反射(Vx=', str(velComps.xComponent), ' Vy=', str(velComps.yComponent), ' Vz=', str(velComps.zComponent), ')'])
 
     return true
   }

@@ -10,6 +10,7 @@
 
 import { g } from 'genshin-ts-touyu/runtime/core'
 
+import { log } from './logger'
 import { doAir, doLock, doRoll, doSlide, doStill } from './ball_physics'
 import { P_IDLE, playerNextState } from './player_fsm'
 import { allowModifier, applyModifier, MOD_NONE } from './player_modifier'
@@ -163,7 +164,7 @@ g.server({
       const newY = BALL_RADIUS + GROUND_EPSILON
       f.设置自定义变量(self, 'ballVy', newVy)
       f.设置自定义变量(self, 'ballY', newY)
-      f.发送信号('日志操作', '物理' as any, f.拼装列表(['地面碰撞 Vy=', str(ballVy), '→', str(newVy)]) as any)
+      log(f, '物理', ['地面碰撞 Vy=', str(ballVy), '→', str(newVy)])
     }
 
     // ==========================================================
@@ -372,7 +373,7 @@ g.server({
     }
 
     if (bool(playerCollided)) {
-      f.发送信号('日志操作', '物理' as any, f.拼装列表(['球员碰撞']) as any)
+      log(f, '物理', ['球员碰撞'])
     }
 
     // ==========================================================
@@ -415,7 +416,7 @@ g.server({
     // ==========================================================
 
     if (bool(newState != currentState)) {
-      f.发送信号('日志操作', '状态机' as any, f.拼装列表(['状态 ', str(currentState), '→', str(newState)]) as any)
+      log(f, '状态机', ['状态 ', str(currentState), '→', str(newState)])
       if (bool(currentState == S_STILL)) {
         exitStill(f)
       } else if (bool(currentState == S_ROLL)) {
@@ -427,7 +428,7 @@ g.server({
       } else if (bool(currentState == S_LOCK)) {
         // 内联 exitLock：lockedBy 用 self（球自身）= 自由
         f.设置自定义变量(self, 'lockedBy', self, true)
-        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['退出锁定 距锁定者=', str(distFromLockerComputed)]) as any)
+        log(f, '锁定', ['退出锁定 距锁定者=', str(distFromLockerComputed)])
       }
 
       if (bool(newState == S_STILL)) {
@@ -439,7 +440,7 @@ g.server({
       } else if (bool(newState == S_AIR)) {
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
-        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['进入锁定 距离=', str(nearestPlayerDist)]) as any)
+        log(f, '锁定', ['进入锁定 距离=', str(nearestPlayerDist)])
         // 内联 enterLock：直接传 nearestPlayerEntity（scan 中追踪的实体引用）
         f.设置自定义变量(self, 'lockedBy', nearestPlayerEntity, true)
         f.设置自定义变量(self, '状态', S_LOCK, true)
@@ -525,7 +526,7 @@ g.server({
     const newBase = playerNextState(playerCtx)
 
     if (bool(newBase != playerState)) {
-      f.发送信号('日志操作', '状态机' as any, f.拼装列表(['球员状态 ', str(playerState), '→', str(newBase)]) as any)
+      log(f, '状态机', ['球员状态 ', str(playerState), '→', str(newBase)])
       f.设置自定义变量(self, 'playerState', newBase, true)
     }
 

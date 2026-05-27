@@ -7,6 +7,7 @@
 
 import { g } from 'genshin-ts-touyu/runtime/core'
 
+import { log } from './logger'
 import { doAir, doLock, doRoll, doSlide, doStill } from './ball_physics'
 import { P_IDLE, playerNextState } from './player_fsm'
 import { allowModifier, applyModifier, MOD_NONE } from './player_modifier'
@@ -135,13 +136,21 @@ g.server({
       f.设置自定义变量(self, 'ballVy', bouncedVy)
       f.设置自定义变量(self, 'ballY', 0.451) // ballRadius(0.45) + ε(0.001)
 
-      f.发送信号('日志操作', '物理' as any, f.拼装列表(['地面碰撞 Vy=', str(ballVy), '→', str(bouncedVy)]) as any)
+      log(f, '物理', ['地面碰撞 Vy=', str(ballVy), '→', str(bouncedVy)])
     }
 
     // ============================================================
     // 3. nearestPlayerId / nearestPlayerDist 已由 Graph 3 写入
     //    buildBallContext 中已读取，此处无额外操作
     // ============================================================
+
+    // ============================================================
+    // 3.5 调试日志：球员在 5m 内时打印诊断信息
+    //     帮助定位「球不动」原因：确认状态、速度、距离等关键值
+    // ============================================================
+    if (bool(nearestPlayerDist < 5.0)) {
+      log(f, '诊断', ['诊断 状态=', str(currentState), ' xz=', str(xzSpeed), ' 最近=', str(nearestPlayerDist), ' 距锁=', str(distFromLockerVal)])
+    }
 
     // ============================================================
     // 4. nextState — 按优先级 1→7 检查守卫，返回目标状态
@@ -153,7 +162,7 @@ g.server({
     //    enter 函数内部写「状态」自定义变量
     // ============================================================
     if (bool(newState != currentState)) {
-      f.发送信号('日志操作', '状态机' as any, f.拼装列表(['状态 ', str(currentState), '→', str(newState)]) as any)
+      log(f, '状态机', ['状态 ', str(currentState), '→', str(newState)])
 
       // exit 旧状态
       if (bool(currentState == S_STILL)) {
@@ -167,7 +176,7 @@ g.server({
       } else if (bool(currentState == S_LOCK)) {
         // 内联 exitLock：用 self（球自身）= 自由
         f.设置自定义变量(self, 'lockedBy', self, true)
-        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['退出锁定 距锁定者=', str(distFromLockerVal)]) as any)
+        log(f, '锁定', ['退出锁定 距锁定者=', str(distFromLockerVal)])
       }
 
       // enter 新状态
@@ -180,7 +189,7 @@ g.server({
       } else if (bool(newState == S_AIR)) {
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
-        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['进入锁定 距离=', str(nearestPlayerDist)]) as any)
+        log(f, '锁定', ['进入锁定 距离=', str(nearestPlayerDist)])
         // 内联 enterLock：内联读取 nearestPlayerId 避免 setLocalVariable 类型解析失败
         f.设置自定义变量(
           self,
@@ -298,6 +307,10 @@ g.server({
 
     // 列表迭代循环，回调为 gstsServer 函数（内部用 gsts.f 英文 API）
     f.列表迭代循环(players, 扫描球员回调)
+
+    // 日志：扫描结果 — 确认扫描器是否找到球员以及距离
+    const scanDist = f.数据类型转换(f.获取自定义变量(self, 'nearestPlayerDist'), 'float')
+    log(f, '扫描', ['扫描 最近球员 距离=', str(scanDist)])
   })
 
 // ============================================================
