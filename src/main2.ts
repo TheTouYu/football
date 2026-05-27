@@ -216,7 +216,7 @@ g.server({
     } else if (bool(state == S_AIR)) {
       doAir(f)
     } else if (bool(state == S_LOCK)) {
-      doLock(f)
+      doLock(f, self)
     }
   })
 

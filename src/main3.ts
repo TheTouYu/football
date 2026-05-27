@@ -381,6 +381,13 @@ g.server({
     // 5. 组装 BallContext 快照
     // ==========================================================
 
+    // nearestPlayerId: 转换为 bigint（entity ID），供 enterLock 存入 lockedBy
+    // 若无有效最近球员（nearestPlayerDist >= 9999），用 0n 哨兵
+    let nearestPlayerIdBigint = 0n
+    if (bool(nearestPlayerDist < 1000.0)) {
+      nearestPlayerIdBigint = f.数据类型转换(nearestPlayerEntity, 'int')
+    }
+
     const ballCtx = {
       state: currentState,
       xzSpeed: xzSpeed,
@@ -393,7 +400,7 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByInt,
-      nearestPlayerId: nearestPlayerEntity,
+      nearestPlayerId: nearestPlayerIdBigint,
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerComputed
     }
@@ -436,6 +443,8 @@ g.server({
 
     // ==========================================================
     // 8. 执行当前状态的 do 函数（物理更新：运动器、速度衰减等）
+    //    在 LOCK 状态时，nearestPlayerEntity 即为 locker 实体
+    //    （canEnterLock 已验证 nearestPlayerDist < 0.5）
     // ==========================================================
 
     if (bool(newState == S_STILL)) {
@@ -447,7 +456,7 @@ g.server({
     } else if (bool(newState == S_AIR)) {
       doAir(f)
     } else if (bool(newState == S_LOCK)) {
-      doLock(f)
+      doLock(f, nearestPlayerEntity)
     }
   })
 

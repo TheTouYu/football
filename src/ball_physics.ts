@@ -252,9 +252,8 @@ export function doAir(f: any): void {
  *      - 注意：不再施加额外踢球力。球速衰减到阈值后，main.ts 调用 nextState()，
  *        由转移表决定是再踢一脚还是退出 LOCK
  */
-export function doLock(f: any): void {
-  // 1. 读取变量 — lockedBy 不加数据类型转换，保留 entity 类型供获取实体位置与旋转
-  const lockedBy = f.获取自定义变量(self, 'lockedBy')
+export function doLock(f: any, lockerEntity: any): void {
+  // 1. 读取变量
   const ballVxRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
   const ballVzRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
 
@@ -262,10 +261,10 @@ export function doLock(f: any): void {
   const xzSpeed = f.三维向量模运算(f.创建三维向量(ballVxRaw, 0.0, ballVzRaw))
 
   if (bool(xzSpeed < 0.05)) {
-    // 2. 球刚进入锁定第一帧：朝向 lockedBy 球员前方，施加初始水平速度
+    // 2. 球刚进入锁定第一帧：朝向 lockerEntity 球员前方，施加初始水平速度
 
-    // 读取 lockedBy 球员实体的位置和面朝方向
-    const lockerLocRot = f.获取实体位置与旋转(lockedBy)
+    // 读取 lockerEntity 球员实体的位置和面朝方向
+    const lockerLocRot = f.获取实体位置与旋转(lockerEntity)
 
     // 计算球员面朝方向（Z 轴正方向旋转球员欧拉角）
     const lockerForward = 计算前向(f, lockerLocRot.rotate)
@@ -303,7 +302,7 @@ export function doLock(f: any): void {
     // 计算球到锁定者的距离（供守卫 canExitLock 检查 distFromLocker > 2m）
     const ballLocRot = f.获取实体位置与旋转(self)
     const ballPos = ballLocRot.location
-    const lockerLocRot = f.获取实体位置与旋转(lockedBy)
+    const lockerLocRot = f.获取实体位置与旋转(lockerEntity)
     const lockerPos = lockerLocRot.location
     const diff = f.三维向量减法(lockerPos, ballPos)
     const distFromLocker = f.三维向量模运算(diff)
