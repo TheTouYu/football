@@ -68,6 +68,10 @@ g.server({
     f.设置自定义变量(self, 'nearestPlayerDist', 999.0)
     f.设置自定义变量(self, '状态', S_STILL)
 
+    // Debug 视觉反馈变量（初始化 0.0，用户设为非零值触发闪烁）
+    f.设置自定义变量(self, '_debugFlash0', 0.0)
+    f.设置自定义变量(self, '_debugFlash1', 0.0)
+
     // 启动 motionTick 循环定时器（120ms 间隔）
     f.启动定时器(self, 'motionTick', true, [0.12])
   })
@@ -402,4 +406,36 @@ g.server({
     if (bool(allowModifier(newBase, playerModifier))) {
       applyModifier(f, newBase, playerModifier)
     }
+  })
+
+// ============================================================
+// Graph 5: Ball_Debug视觉 (ID 1073742444, 挂载足球实体)
+// 职责：监听 debug 自定义变量变化 → 触发一帧视觉闪烁
+//       用户通过 f.设置自定义变量(self, '_debugFlash0', <任意值>, true)
+//       触发视觉反馈（球模型闪烁一次，用于调试状态机判断）
+// ============================================================
+
+g.server({
+  id: 1073742444,
+  name: 'Ball_Debug视觉',
+  lang: 'zh'
+})
+  .on('自定义变量变化时', (evt, f) => {
+    // 快速过滤：只处理 _debugFlash0 / _debugFlash1，其余立即返回
+    const notFlash0 = bool(evt.variableName != '_debugFlash0')
+    const notFlash1 = bool(evt.variableName != '_debugFlash1')
+    if (bool(notFlash0 && notFlash1)) {
+      return
+    }
+
+    // 触发一帧视觉闪烁：隐藏模型 → 0.05s 后恢复
+    // 激活关闭模型显示: true=可见, false=不可见
+    f.激活关闭模型显示(self, false as any)
+    f.启动定时器(self, 'debugFlashRestore', false, [0.05])
+  })
+  .on('定时器触发时', (evt, f) => {
+    if (bool(evt.timerName != 'debugFlashRestore')) {
+      return
+    }
+    f.激活关闭模型显示(self, true as any)
   })
