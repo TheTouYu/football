@@ -426,6 +426,18 @@ const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity"
 ### 7.25 gstsServer 回调函数内用 gsts.f 英文 API
 作为 `列表迭代循环` 回调的 `gstsServer` 函数内，必须使用 `gsts.f` + 英文 API 名（如 `gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer`、`gsts.f.getCorrespondingValueFromList`、`gsts.f._3dVectorSubtraction` 等），因为 `gsts.f` 的 TypeScript 类型定义不含中文别名。中文 API 名只能在 `f`（`any` 类型）上使用。<!-- Agent Touyu 2026-05-27 -->
 
+### 7.26 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
+读取自定义变量时，统一使用 `.asType('float')` / `.asType('int')` 简写，替代 `f.数据类型转换(f.获取自定义变量(...), 'float')`：
+```typescript
+// ✅ 推荐（简短、清晰）
+const ballVx = f.获取自定义变量(self, 'ballVx').asType('float')
+const state  = f.获取自定义变量(self, '状态').asType('int')
+
+// ❌ 旧模式（冗余、易错）
+const ballVx = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
+```
+`.asType()` 已在所有源文件中全局替换，不再使用 `f.数据类型转换`。<!-- 2026-05-27 -->
+
 ---
 
 ## 8. 当前进度
