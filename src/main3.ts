@@ -15,12 +15,10 @@ import { P_IDLE, playerNextState } from './player_fsm'
 import { allowModifier, applyModifier, MOD_NONE } from './player_modifier'
 import {
   enterAir,
-  enterLock,
   enterRoll,
   enterSlide,
   enterStill,
   exitAir,
-  exitLock,
   exitRoll,
   exitSlide,
   exitStill,
@@ -96,17 +94,17 @@ function _计算力系数(dot: number): number {
 // ============================================================
 
 g.server({
-  id: 1073742440,
+  id: 1073742442,
   lang: 'zh',
   variables: {
-    _init: false
+    _init3: false
   }
 })
   .on('实体创建时', (_evt, f) => {
-    if (f.获取节点图变量自动类型推断('_init')) {
+    if (f.获取节点图变量自动类型推断('_init3')) {
       return
     }
-    f.设置节点图变量自动类型推断('_init', true)
+    f.设置节点图变量自动类型推断('_init3', true)
 
     // 初始化足球自定义变量
     f.设置自定义变量(self, 'ballVx', 0.0)
@@ -121,7 +119,7 @@ g.server({
     f.设置自定义变量(self, 'angularDecay', 0.9)
     f.设置自定义变量(self, 'airResistance', 0.995)
     f.设置自定义变量(self, 'gravity', 9.8)
-    f.设置自定义变量(self, 'lockedBy', 0n)
+    f.设置自定义变量(self, 'lockedBy', self)
     f.设置自定义变量(self, 'distFromLocker', 0.0)
     f.设置自定义变量(self, '状态', 0n)
 
@@ -144,7 +142,7 @@ g.server({
     const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
     const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
     const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
-    const lockedByInt = f.数据类型转换(f.获取自定义变量(self, 'lockedBy'), 'int')
+    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity")
     const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
 
     // 派生：xzSpeed
@@ -379,14 +377,8 @@ g.server({
 
     // ==========================================================
     // 5. 组装 BallContext 快照
+    //    nearestPlayerId 在此设为 0n 占位 — enterLock/exitLock 已内联，不依赖 ctx.nearestPlayerId
     // ==========================================================
-
-    // nearestPlayerId: 转换为 bigint（entity ID），供 enterLock 存入 lockedBy
-    // 若无有效最近球员（nearestPlayerDist >= 9999），用 0n 哨兵
-    let nearestPlayerIdBigint = 0n
-    if (bool(nearestPlayerDist < 1000.0)) {
-      nearestPlayerIdBigint = f.数据类型转换(nearestPlayerEntity, 'int')
-    }
 
     const ballCtx = {
       state: currentState,
@@ -399,8 +391,8 @@ g.server({
       angularVy: angularVy,
       angularVz: angularVz,
       ballRadius: ballRadius,
-      lockedBy: lockedByInt,
-      nearestPlayerId: nearestPlayerIdBigint,
+      lockedBy: lockedByEntity,
+      nearestPlayerId: 0n,
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerComputed
     }
@@ -425,7 +417,8 @@ g.server({
       } else if (bool(currentState == S_AIR)) {
         exitAir(f)
       } else if (bool(currentState == S_LOCK)) {
-        exitLock(f)
+        // 内联 exitLock：lockedBy 用 self（球自身）= 自由
+        f.设置自定义变量(self, 'lockedBy', self, true)
       }
 
       if (bool(newState == S_STILL)) {
@@ -437,7 +430,9 @@ g.server({
       } else if (bool(newState == S_AIR)) {
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
-        enterLock(f, ballCtx)
+        // 内联 enterLock：直接传 nearestPlayerEntity（scan 中追踪的实体引用）
+        f.设置自定义变量(self, 'lockedBy', nearestPlayerEntity, true)
+        f.设置自定义变量(self, '状态', S_LOCK, true)
       }
     }
 
@@ -467,17 +462,17 @@ g.server({
 // ============================================================
 
 g.server({
-  id: 1073742441,
+  id: 1073742443,
   lang: 'zh',
   variables: {
-    _init: false
+    _init3: false
   }
 })
   .on('实体创建时', (_evt, f) => {
-    if (f.获取节点图变量自动类型推断('_init')) {
+    if (f.获取节点图变量自动类型推断('_init3')) {
       return
     }
-    f.设置节点图变量自动类型推断('_init', true)
+    f.设置节点图变量自动类型推断('_init3', true)
 
     f.设置自定义变量(self, 'playerState', P_IDLE)
     f.设置自定义变量(self, 'playerModifier', MOD_NONE)
@@ -495,7 +490,7 @@ g.server({
     const playerState = f.数据类型转换(f.获取自定义变量(self, 'playerState'), 'int')
     const playerModifier = f.数据类型转换(f.获取自定义变量(self, 'playerModifier'), 'int')
     const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
-    const ballLockedBy = f.数据类型转换(f.获取自定义变量(ball, 'lockedBy'), 'int')
+    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType("entity")
 
     const selfLocRot = f.获取实体位置与旋转(self)
     const selfPos = selfLocRot.location

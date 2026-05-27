@@ -3,6 +3,8 @@
 // 按 docs/STATE_MACHINE_DESIGN_ZH.md 第 4 节规范实现
 // 当前阶段：骨架。转移逻辑后续填充（涉及玩家输入和 AI 决策）
 
+import { entity } from "genshin-ts-touyu/runtime/value"
+
 // ============================================================
 // 4.1 基础状态枚举（bigint，同一时刻只有 1 个 active）
 // ============================================================
@@ -35,7 +37,7 @@ export interface PlayerContext {
   /** Ball FSM 的当前状态（S_STILL / S_ROLL / S_SLIDE / S_AIR / S_LOCK） */
   ballState: bigint
   /** Ball 的 lockedBy 字段（0n = 自由，非 0n = 被某球员锁定） */
-  ballLockedBy: bigint
+  ballLockedBy: entity
   /** 自身到球的距离（米） */
   distToBall: number
   /** 自身的水平速率（米/秒） */

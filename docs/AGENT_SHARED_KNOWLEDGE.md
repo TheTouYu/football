@@ -55,7 +55,13 @@
 | `1073742435` | **节点图 ID** (旧) | slide.ts 旧架构用的足球实体图 |
 | `1073742436` | **节点图 ID** (旧) | air.ts 旧架构用的足球实体图 |
 | `1073742437` | **节点图 ID** (旧) | kick.ts 旧架构用的角色实体图 |
-| `1073742438+` | **节点图 ID** (新) | 新架构从 1073742438 开始递增分配 |
+| `1073742438` | **节点图 ID** | main2.ts Ball_主控 — 状态转移 + tick 协调 |
+| `1073742439` | **节点图 ID** | main2.ts Ball_物理 — 各状态 do() 物理计算 |
+| `1073742440` | **节点图 ID** | main2.ts Ball_玩家扫描 — 0.5s 间隔扫描最近球员 |
+| `1073742441` | **节点图 ID** | main2.ts Player_FSM — 球员基础状态机 |
+| `1073742442` | **节点图 ID** | main3.ts Ball FSM — 完整足球物理（扫描+碰撞+转移+物理） |
+| `1073742443` | **节点图 ID** | main3.ts Player FSM — 球员基础状态机 |
+| `1073742444+` | **节点图 ID** (新) | 后续新增从 1073742444 开始递增分配 |
 
 > **关键区别**：`prefabId` ≠ 节点图 ID。prefabId 是编辑器中元件的标识，节点图 ID 是代码逻辑挂载的标识。用 `prefabId()` 查找实体时用元件 ID，用 `g.server({ id: ... })` 配置时用节点图 ID。
 
@@ -335,8 +341,8 @@ npm run build      # 编译 + GIA + 注入
 ### 7.6 运动器 duration
 运动器 duration 设为 `0.24`（= 2 × tick 间隔），因为每个 tick 都会重新施加运动器，确保运动器不会在两次 tick 之间到期。
 
-### 7.7 lockedBy 用 0n 哨兵值表示「无锁定者」
-`BallContext.lockedBy` 在 TypeScript 接口中设计为 `bigint | null`，但 genshin-ts 节点图变量类型为 `bigint`，不支持 `null`。实际使用 `0n` 作为哨兵值（`0n = 自由`），守卫中比较 `ctx.lockedBy === 0n`。`main.ts` 在构建 BallContext 时做 `0n ↔ null` 转换。<!-- Agent A 2026-05-27 -->
+### 7.7 lockedBy 用 entity 类型 + self 哨兵值表示「无锁定者」
+`BallContext.lockedBy` 现在使用 `entity` 类型（`import { entity } from "genshin-ts-touyu/runtime/value"`），哨兵值为 `self`（球自身实体 = 自由）。守卫 `canEnterLock` 中比较 `ctx.lockedBy === new entity`（已在 stateMachine.ts 实现）。自定义变量读写用 `.asType("entity")` 显式转换。`exitLock`/`enterLock` 必须内联以直接操作 entity 引用。<!-- Agent Touyu 2026-05-27，更新于 2026-05-27 -->
 
 ### 7.8 `f.停止并删除基础运动器` 的第三个参数
 `f.停止并删除基础运动器(self, '<任意名称>', true)` — 第三个参数 `true` 表示删除该实体上**所有**基础运动器，此时第二个参数（名称）无关紧要。exit 函数中可用此 API 一次性清理所有运动器。<!-- Agent A 2026-05-27 -->
@@ -396,6 +402,30 @@ LOCK 状态的 do 函数分为两个阶段：第一帧（xzSpeed < 0.05）施加
 ### 7.20 马格努斯偏移的简化实现
 马格努斯效应的简化版为 cross(ω归一化, V) × 微小系数（0.005），将得到的偏移向量加到速度 V 上。这在节点图中需要 5 步：ω 归一化 → cross(ω_norm, V) → scale → 加回 V → 拆分。注意 cross product 使用 `f._3dVectorCrossProduct`（英文名）。<!-- Agent B 2026-05-27 -->
 
+### 7.21 BallContext 和 PlayerContext 中锁定者字段用 entity 类型
+`BallContext.lockedBy` 和 `PlayerContext.ballLockedBy` 现在使用 `entity` 类型（`import { entity } from "genshin-ts-touyu/runtime/value"`），而非 `bigint`。读取 lockedBy 自定义变量时用 `.asType("entity")` 显式转换：
+```typescript
+const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity")
+```
+哨兵值：`self`（球自身）= 自由/未锁定，非 self = 被某玩家锁定。<!-- Agent Touyu 2026-05-27 -->
+
+### 7.22 角色实体有 `.pos` 属性，不需要 `getEntityLocationAndRotation`
+角色实体（从 `获取指定玩家所有角色实体` 返回）是特殊的 entity 类型，自带 `.pos` 属性直接返回位置（Vec3），不需要通过 `获取实体位置与旋转` 取 `.location`。这与普通实体（如足球）不同——普通实体必须用 `getEntityLocationAndRotation`。<!-- Agent Touyu 2026-05-27 -->
+
+### 7.23 列表迭代循环 / gstsServer 内访问列表元素用 `getCorrespondingValueFromList`
+在 `列表迭代循环` 回调或 `gstsServer` 函数内，`chars[0]` 直接索引不会产生有效的 entity pin，导致 GIA 报 `无效的值类型: entity`。
+**正确做法**：显式调用 `gsts.f.getCorrespondingValueFromList(chars, 0)` 获取列表元素，这样 GIA 编译器能正确解析 entity 类型。
+`.asType("entity")` 和 `.at(0)` 方法在 list element 上均不可用。<!-- Agent Touyu 2026-05-27 -->
+
+### 7.24 enterLock / exitLock 内联 + doLock 签名变更
+由于 `lockedBy` 升级为 entity 类型：
+- **`exitLock`** 必须内联：`f.设置自定义变量(self, 'lockedBy', self, true)`（不能用 `0n`，那是 bigint）
+- **`enterLock`** 必须内联：`f.设置自定义变量(self, 'lockedBy', nearestPlayerEntity, true)`（直接传 entity 引用）
+- **`doLock`** 签名改为 `doLock(f: any, lockerEntity: any)`：locker entity 通过参数传入，不通过 custom var 中转（custom var 存 entity 后 GIA 无法解析给 `getEntityLocationAndRotation`）<!-- Agent Touyu 2026-05-27 -->
+
+### 7.25 gstsServer 回调函数内用 gsts.f 英文 API
+作为 `列表迭代循环` 回调的 `gstsServer` 函数内，必须使用 `gsts.f` + 英文 API 名（如 `gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer`、`gsts.f.getCorrespondingValueFromList`、`gsts.f._3dVectorSubtraction` 等），因为 `gsts.f` 的 TypeScript 类型定义不含中文别名。中文 API 名只能在 `f`（`any` 类型）上使用。<!-- Agent Touyu 2026-05-27 -->
+
 ---
 
 ## 8. 当前进度
@@ -409,4 +439,6 @@ LOCK 状态的 do 函数分为两个阶段：第一帧（xzSpeed < 0.05）施加
 | `player_modifier.ts` | 已完成 | Agent D | Phase 5，骨架：叠层枚举+allowModifier兼容矩阵+applyModifier（SPRINT效果后续实现） |<!-- Agent D 2026-05-27 -->
 | `kick_weights.ts` | 可直接复用 | — | 从 src_old/ 复制 |
 | `kick.ts` | 待开始 | — | 踢球力学，需适配新接口 |
-| `main.ts` | 待开始 | — | 最后组装 |
+| `main.ts` | 旧架构 | — | src_old/main.ts，仅作参考 |
+| `main2.ts` | 已完成 | Agent Touyu | 4 Graph 架构：主控+物理+扫描+Player FSM，列表迭代循环扫描 |
+| `main3.ts` | 已完成 | Agent Touyu | 2 Graph 架构：Ball FSM（8索引扫描+内联碰撞）+ Player FSM |

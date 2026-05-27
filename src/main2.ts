@@ -16,7 +16,6 @@ import {
   enterSlide,
   enterStill,
   exitAir,
-  exitLock,
   exitRoll,
   exitSlide,
   exitStill,
@@ -62,7 +61,7 @@ g.server({
     f.设置自定义变量(self, 'angularDecay', 0.9)
     f.设置自定义变量(self, 'airResistance', 0.995)
     f.设置自定义变量(self, 'gravity', 9.8)
-    f.设置自定义变量(self, 'lockedBy', 0n)
+    f.设置自定义变量(self, 'lockedBy', self)
     f.设置自定义变量(self, 'distFromLocker', 0.0)
     f.设置自定义变量(self, 'nearestPlayerId', self) // 用球实体自身作为哨兵值，保持 entity 类型一致
     f.设置自定义变量(self, 'nearestPlayerDist', 999.0)
@@ -90,7 +89,7 @@ g.server({
     const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
     const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
     const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
-    const lockedByInt = f.数据类型转换(f.获取自定义变量(self, 'lockedBy'), 'int')
+    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity")
     const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
     // nearestPlayerId 由 Graph 3 扫描写入（保持 entity 类型）
     // 不在此处声明局部变量 — 仅在进入 LOCK 时内联读取，避免 setLocalVariable 类型解析失败
@@ -112,7 +111,7 @@ g.server({
       angularVy: angularVy,
       angularVz: angularVz,
       ballRadius: ballRadius,
-      lockedBy: lockedByInt,
+      lockedBy: lockedByEntity,
       nearestPlayerId: 0n, // unused by guards; real value read inline in enterLock
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerVal
@@ -161,7 +160,8 @@ g.server({
       } else if (bool(currentState == S_AIR)) {
         exitAir(f)
       } else if (bool(currentState == S_LOCK)) {
-        exitLock(f)
+        // 内联 exitLock：用 self（球自身）= 自由
+        f.设置自定义变量(self, 'lockedBy', self, true)
       }
 
       // enter 新状态
@@ -175,7 +175,7 @@ g.server({
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
         // 内联 enterLock：内联读取 nearestPlayerId 避免 setLocalVariable 类型解析失败
-        f.设置自定义变量(self, 'lockedBy', f.获取自定义变量(self, 'nearestPlayerId'), true)
+        f.设置自定义变量(self, 'lockedBy', f.获取自定义变量(self, 'nearestPlayerId').asType("entity"), true)
         f.设置自定义变量(self, '状态', S_LOCK, true)
       }
     }
@@ -216,7 +216,8 @@ g.server({
     } else if (bool(state == S_AIR)) {
       doAir(f)
     } else if (bool(state == S_LOCK)) {
-      doLock(f, self)
+      const lockerEntity = f.获取自定义变量(self, 'nearestPlayerId').asType("entity")
+      doLock(f, lockerEntity)
     }
   })
 
@@ -226,6 +227,36 @@ g.server({
 //       结果写入 nearestPlayerId / nearestPlayerDist 自定义变量
 //       Graph 1 直接读取这些变量
 // ============================================================
+
+/**
+ * 列表迭代循环回调：扫描单个玩家，更新最近球员追踪
+ * 角色实体用法不同：chars.at(0)?.pos 直接获取位置，不需要 getEntityLocationAndRotation
+ */
+function 扫描球员回调(playerEntity: any, _breakLoop: any): void {
+  // 获取角色实体列表
+  const chars = gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer(playerEntity)
+  // getCorrespondingValueFromList 获取列表元素（显式 API，避免 [0] 的 entity 类型问题）
+  const char = gsts.f.getCorrespondingValueFromList(chars, 0)
+  // 角色实体有 .pos 属性，直接拿位置（不需要 getEntityLocationAndRotation）
+  const charPos = char.pos
+
+  // 获取球位置（self 是普通实体，需要 getEntityLocationAndRotation）
+  const ballLocRot = gsts.f.getEntityLocationAndRotation(self)
+  const ballPos = ballLocRot.location
+
+  // 计算距离
+  const diff = gsts.f._3dVectorSubtraction(charPos, ballPos)
+  const dist = gsts.f._3dVectorModuloOperation(diff)
+
+  // 读取当前最近距离
+  const currNearest = gsts.f.dataTypeConversion(gsts.f.getCustomVariable(self, 'nearestPlayerDist'), 'float')
+
+  // 如果更近，更新最近球员
+  if (bool(dist < currNearest)) {
+    gsts.f.setCustomVariable(self, 'nearestPlayerDist', dist)
+    gsts.f.setCustomVariable(self, 'nearestPlayerId', char)
+  }
+}
 
 g.server({
   id: 1073742440,
@@ -245,40 +276,13 @@ g.server({
     // 获取场上所有玩家实体列表
     const players = f.获取在场玩家实体列表()
 
-    // 获取足球实体
-    const balls = f.获取场上指定元件ID的实体(prefabId(1077936262))
-    const ball = balls[0]
-
+    // self 就是足球实体（此 node graph 挂在足球上）
     // 初始化最近距离为极大值（每次扫描开始前重置）
-    f.设置自定义变量(ball, 'nearestPlayerDist', 999.0)
-    // nearestPlayerId 默认设为球自身（保持 entity 类型一致，避免 GIA 类型解析失败）
-    f.设置自定义变量(ball, 'nearestPlayerId', ball)
+    f.设置自定义变量(self, 'nearestPlayerDist', 999.0)
+    f.设置自定义变量(self, 'nearestPlayerId', self)
 
-    // 用列表迭代循环（不展开固定索引），找出离球最近的球员
-    f.列表迭代循环(players, (playerEntity: any) => {
-      // 获取该玩家的第一个角色实体
-      const chars = f.获取指定玩家所有角色实体(playerEntity)
-      const char: any = chars[0]
-
-      // 获取球和角色的位置
-      const ballLocRot = f.获取实体位置与旋转(ball)
-      const ballPos = ballLocRot.location
-      const charLocRot = f.获取实体位置与旋转(char)
-      const charPos = charLocRot.location
-
-      // 计算距离
-      const diff = f.三维向量减法(charPos, ballPos)
-      const dist = f.三维向量模运算(diff)
-
-      // 读取当前最近距离
-      const currNearest = f.数据类型转换(f.获取自定义变量(ball, 'nearestPlayerDist'), 'float')
-
-      // 如果更近，更新最近球员
-      if (bool(dist < currNearest)) {
-        f.设置自定义变量(ball, 'nearestPlayerDist', dist)
-        f.设置自定义变量(ball, 'nearestPlayerId', char)
-      }
-    })
+    // 列表迭代循环，回调为 gstsServer 函数（内部用 gsts.f 英文 API）
+    f.列表迭代循环(players, 扫描球员回调)
   })
 
 // ============================================================
@@ -331,7 +335,7 @@ g.server({
 
     // 跨实体读足球变量
     const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
-    const ballLockedBy = f.数据类型转换(f.获取自定义变量(ball, 'lockedBy'), 'int')
+    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType("entity")
 
     // 计算自身到球的距离
     const selfLocRot = f.获取实体位置与旋转(self)
