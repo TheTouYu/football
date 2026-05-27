@@ -442,7 +442,24 @@ const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity"
 ### 7.25 gstsServer 回调函数内用 gsts.f 英文 API
 作为 `列表迭代循环` 回调的 `gstsServer` 函数内，必须使用 `gsts.f` + 英文 API 名（如 `gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer`、`gsts.f.getCorrespondingValueFromList`、`gsts.f._3dVectorSubtraction` 等），因为 `gsts.f` 的 TypeScript 类型定义不含中文别名。中文 API 名只能在 `f`（`any` 类型）上使用。<!-- Agent Touyu 2026-05-27 -->
 
-### 7.26 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
+### 7.26 Debug 调试变量触发即时 tick
+在足球实体上新增了节点图 `Ball_Debug视觉`（ID 1073742444），用于调试。原理：
+- 2 个 float 调试变量 `_debugFlash0` / `_debugFlash1`（初始化 0.0）
+- 监听 `自定义变量变化时` 事件，非 debug 变量快速过滤返回
+- 匹配时：将 `motionTick` 定时器替换为 0.01s 一次性定时器（同名覆盖）
+  → 0.01s 后 Ball_主控的 tick handler 运行一轮状态机
+  → tick handler 末尾重新拉起 0.12s 循环定时器
+
+用户使用方法：
+```typescript
+// 在任意有 f 和 ball 引用的位置触发一次即时 tick
+f.设置自定义变量(ball, '_debugFlash0', 1.0, true)  // 第三个参数 true 触发事件
+```
+关键：必须传 `triggerEvent=true` 参数，否则不触发 `自定义变量变化时` 事件。
+
+注意：`motionTick` 循环定时器的重启移到了 tick handler 末尾（而非仅在 `实体创建时` 启动一次），这是为了 debug one-shot 触发后能恢复循环。正常运行时每 120ms 重启一次无副作用。<br/><!-- 2026-05-27 -->
+
+### 7.27 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
 读取自定义变量时，统一使用 `.asType('float')` / `.asType('int')` 简写，替代 `f.数据类型转换(f.获取自定义变量(...), 'float')`：
 ```typescript
 // ✅ 推荐（简短、清晰）
