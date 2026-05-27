@@ -25,6 +25,59 @@
 - `gstsServer` 函数只能有一个尾部的 `return <expr>`
 - 在 `gstsServer` 内部直接用 `gsts.f`，不需要 `f` 参数
 
+### 1.4 全局 Helper 与类型转换速查
+
+#### 类型转换 / 构造
+
+| 函数 | 说明 |
+|------|------|
+| `bool(x)` | 转为布尔类型。条件判断必须用 `bool(...)` 包裹 |
+| `int(x)` | 转为整数类型（bigint） |
+| `float(x)` | 转为浮点类型（number） |
+| `str(x)` | 转为字符串类型。`str()` 返回的是原生 JS `string`，可用于 `拼装列表` |
+| `idx(x)` | 帮助 `bigint` / `IntValue` 索引通过 TS 类型检查。**仅类型检查用**，节点图 int 语义不变。用法：`arr[idx(i)]` |
+| `vec3(x)` | 创建三维向量。**仅接受字面量**，不接受运行时 float 变量。从 float 变量构建 vec3 必须用 `f.创建三维向量(x, y, z)` |
+| `guid(x)` | 创建 GUID 值 |
+| `prefabId(x)` | 元件预制体 ID。如 `prefabId(1077936262)` |
+| `configId(x)` | 配置 ID |
+| `faction(x)` | 阵营值 |
+| `entity(x)` | 实体值。导入：`import { entity } from 'genshin-ts-touyu/runtime/value'` |
+
+#### 列表 / 字典构造
+
+| 函数 | 说明 |
+|------|------|
+| `list('int', items)` | 显式列表类型声明，**空数组必须用**此函数指定元素类型。例：`list('int', [])`、`list('entity', [self])` |
+| `dict(...)` | 创建**只读**字典。需可变字典时用节点图变量（`f.get` / `f.set`） |
+
+#### 编译器控制
+
+| 函数 | 说明 |
+|------|------|
+| `raw(...)` | 编译器忽略此代码块，按 JS 原生语义执行。用于绕过编译器限制（如 `Object.*` / `JSON.*` 操作） |
+
+#### 实体与场景
+
+| 标识符 | 说明 |
+|--------|------|
+| `self` | 当前节点图所挂载的实体。足球图 = 足球实体，角色图 = 角色实体 |
+| `player(n)` | 玩家实体（从 `1` 开始编号） |
+| `stage` / `level` | 关卡实体别名 |
+| `GameObject.Find(...)` | 按名称查找实体（Unity 风格） |
+| `FindWithTag(...)` | 按标签查找实体（Unity 风格） |
+| `FindByPrefabId(...)` | 按元件 ID 查找实体（Unity 风格） |
+
+#### 数学与向量（全局可用）
+
+| API | 说明 |
+|-----|------|
+| `Math.*` | 标准数学函数。在 server 作用域内**编译为节点图等效操作** |
+| `Mathf.*` | Unity 风格数学 API（`Mathf.Abs`、`Mathf.Clamp` 等） |
+| `Vector3.*` | Unity 风格三维向量 API（`Vector3.Distance`、`Vector3.Dot` 等） |
+| `Random.*` | Unity 风格随机数 API（`Random.Range` 等） |
+
+> **关键区别**：`Math.*` 在 server scope 内自动编译为 GIA 节点；`vec3()` 是全局值构造函数（仅接受字面量）；`f.创建三维向量(x,y,z)` 是节点图 API（接受运行时变量）。三者不可混用。
+
 ---
 
 ## 2. 架构约束
@@ -61,7 +114,10 @@
 | `1073742441` | **节点图 ID** | main2.ts Player_FSM — 球员基础状态机 |
 | `1073742442` | **节点图 ID** | main3.ts Ball FSM — 完整足球物理（扫描+碰撞+转移+物理） |
 | `1073742443` | **节点图 ID** | main3.ts Player FSM — 球员基础状态机 |
-| `1073742444+` | **节点图 ID** (新) | 后续新增从 1073742444 开始递增分配 |
+| `1073742444` | **节点图 ID** | main2.ts Ball_Debug视觉 — 调试单步执行（暂停/恢复定时器） |
+| `1073742445` | **节点图 ID** | debug_controller.ts Debug_创建控制台 — 游戏开始时创建元件7 |
+| `1073742446` | **节点图 ID** | debug_controller.ts Debug_选项卡控制 — 选项卡触发单步/恢复 |
+| `1073742447+` | **节点图 ID** (新) | 后续新增从 1073742447 开始递增分配 |
 
 > **关键区别**：`prefabId` ≠ 节点图 ID。prefabId 是编辑器中元件的标识，节点图 ID 是代码逻辑挂载的标识。用 `prefabId()` 查找实体时用元件 ID，用 `g.server({ id: ... })` 配置时用节点图 ID。
 
@@ -341,8 +397,17 @@ npm run build      # 编译 + GIA + 注入
 ### 7.6 运动器 duration
 运动器 duration 设为 `0.24`（= 2 × tick 间隔），因为每个 tick 都会重新施加运动器，确保运动器不会在两次 tick 之间到期。
 
-### 7.7 lockedBy 用 entity 类型 + self 哨兵值表示「无锁定者」
-`BallContext.lockedBy` 现在使用 `entity` 类型（`import { entity } from "genshin-ts-touyu/runtime/value"`），哨兵值为 `self`（球自身实体 = 自由）。守卫 `canEnterLock` 中比较 `ctx.lockedBy === new entity`（已在 stateMachine.ts 实现）。自定义变量读写用 `.asType("entity")` 显式转换。`exitLock`/`enterLock` 必须内联以直接操作 entity 引用。<!-- Agent Touyu 2026-05-27，更新于 2026-05-27 -->
+### 7.7 lockedBy 用 entity 类型 + `canEnterLock` 不再做 entity 比较
+`BallContext.lockedBy` 使用 `entity` 类型。自定义变量读写用 `.asType("entity")` 显式转换。`exitLock`/`enterLock` 必须内联以直接操作 entity 引用。
+
+⚠️ **关键发现**：纯 TS 守卫函数（`canEnterLock`）中不能使用 `entity === entity` 做比较！纯函数中的 `===` 编译为 JS 引用比较，而 `.asType("entity")` 每次返回新包装对象，引用永远不等。也不会生成 GIA `equal(entity,entity)` 节点。
+
+**当前方案**：`canEnterLock` 直接不检查 entity 比较，仅依赖状态机优先级防止重复进入 S_LOCK：
+- S_LOCK 时先检查 `canExitLock`（优先级 1），不满足才轮到 `canEnterLock`
+- 即使 `canEnterLock` 返回 S_LOCK（与当前状态相同），`newState != currentState` 为 false，不执行 exit/enter
+- `doLock` 由独立 Graph（Ball_物理）持续运行，不受影响
+
+相关自定义变量（`lockedBy`、`distFromLocker`）在 `exitLock`/`enterLock` 时由 handler 内联维护。<!-- Agent Touyu 2026-05-27，更新于 2026-05-27 -->
 
 ### 7.8 `f.停止并删除基础运动器` 的第三个参数
 `f.停止并删除基础运动器(self, '<任意名称>', true)` — 第三个参数 `true` 表示删除该实体上**所有**基础运动器，此时第二个参数（名称）无关紧要。exit 函数中可用此 API 一次性清理所有运动器。<!-- Agent A 2026-05-27 -->
@@ -351,7 +416,14 @@ npm run build      # 编译 + GIA + 注入
 genshin-ts 的中文函数名（`设置自定义变量`、`停止并删除基础运动器` 等）没有 TypeScript 类型声明，entry/exit 函数参数只能用 `f: any`。需在文件头添加 `/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */` 抑制由此产生的 ESLint 错误。`no-explicit-any` 在该项目中配置为 `warn` 级别，可接受。<!-- Agent A 2026-05-27 -->
 
 ### 7.10 守卫函数是纯 TypeScript 函数，不是 node graph entry point
-守卫函数（`canExitLock`、`canEnterLock` 等）和 `nextState`、`dispatchGroundState` 是纯 TypeScript 函数，仅供 `main.ts` 在 tick 事件处理器中调用。它们不直接调用 `f` API，而是通过参数 `ctx: BallContext` 接收所有需要的数据。编译时 genshin-ts 会将它们展开为节点图调用。<!-- Agent A 2026-05-27 -->
+守卫函数（`canExitLock`、`canEnterLock` 等）和 `nextState`、`dispatchGroundState` 是纯 TypeScript 函数，仅供 `main.ts` 在 tick 事件处理器中调用。它们不直接调用 `f` API，而是通过参数 `ctx: BallContext` 接收所有需要的数据。
+
+⚠️ **纯函数中的运算限制**：纯 TS 函数中的运算符不会生成 GIA 节点。handler 内的 `a < b` 编译为 `gsts.f.lessThan(a.value, b)`（生成 GIA `less_than` 节点），但纯函数内的 `===` 编译为 JS 引用比较。具体表现：
+- `number < number`（如 `xzSpeed < 2.0`）— ✅ 通过 `valueOf()` 取值比较，结果正确
+- `bigint === bigint`（如 `state === S_LOCK`）— ✅ bigint 按值比较
+- `entity === entity`（如 `lockedBy === ballSelf`）— **❌ 引用比较，永远 false**
+
+**原则**：`entity` 类型的相等判断必须在 handler 中用 `f.是否相等(entityA, entityB)` 进行，不能在纯函数中做。<!-- Agent A 2026-05-27，补充于 2026-05-27 -->
 
 ### 7.11 player_fsm 和 player_modifier 的骨架模式
 球员状态机（player_fsm.ts）目前只需要纯 TypeScript 骨架，不需要 `f` 参数。转移逻辑 `playerNextState` 暂时返回 `ctx.state` 保持状态不变，后续填充转移表时模式与 `stateMachine.ts` 的 `nextState` 一致：按优先级依次检查守卫条件，返回第一个命中的目标状态。<!-- Agent D 2026-05-27 -->
@@ -426,7 +498,24 @@ const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity"
 ### 7.25 gstsServer 回调函数内用 gsts.f 英文 API
 作为 `列表迭代循环` 回调的 `gstsServer` 函数内，必须使用 `gsts.f` + 英文 API 名（如 `gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer`、`gsts.f.getCorrespondingValueFromList`、`gsts.f._3dVectorSubtraction` 等），因为 `gsts.f` 的 TypeScript 类型定义不含中文别名。中文 API 名只能在 `f`（`any` 类型）上使用。<!-- Agent Touyu 2026-05-27 -->
 
-### 7.26 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
+### 7.26 Debug 调试变量触发即时 tick
+在足球实体上新增了节点图 `Ball_Debug视觉`（ID 1073742444），用于调试。原理：
+- 2 个 float 调试变量 `_debugFlash0` / `_debugFlash1`（初始化 0.0）
+- 监听 `自定义变量变化时` 事件，非 debug 变量快速过滤返回
+- 匹配时：将 `motionTick` 定时器替换为 0.01s 一次性定时器（同名覆盖）
+  → 0.01s 后 Ball_主控的 tick handler 运行一轮状态机
+  → tick handler 末尾重新拉起 0.12s 循环定时器
+
+用户使用方法：
+```typescript
+// 在任意有 f 和 ball 引用的位置触发一次即时 tick
+f.设置自定义变量(ball, '_debugFlash0', 1.0, true)  // 第三个参数 true 触发事件
+```
+关键：必须传 `triggerEvent=true` 参数，否则不触发 `自定义变量变化时` 事件。
+
+注意：`motionTick` 循环定时器的重启移到了 tick handler 末尾（而非仅在 `实体创建时` 启动一次），这是为了 debug one-shot 触发后能恢复循环。正常运行时每 120ms 重启一次无副作用。<br/><!-- 2026-05-27 -->
+
+### 7.27 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
 读取自定义变量时，统一使用 `.asType('float')` / `.asType('int')` 简写，替代 `f.数据类型转换(f.获取自定义变量(...), 'float')`：
 ```typescript
 // ✅ 推荐（简短、清晰）
@@ -438,13 +527,73 @@ const ballVx = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'fl
 ```
 `.asType()` 已在所有源文件中全局替换，不再使用 `f.数据类型转换`。<!-- 2026-05-27 -->
 
+### 7.27 跨文件函数调用必须加 `gstsServer` 前缀，且参数必须是原始类型（不能传对象）
+
+**惨痛教训**：非 `gstsServer` 的跨文件函数，如果参数是对象字面量（如 `{state, xzSpeed, ...}`），编译器会**静默丢弃**该函数调用，将返回值替换为默认值（`0` / 初始值），不报任何错误！
+
+**症状**（`main2.ts` Graph 1）：
+```typescript
+// ❌ 错误：nextState 接收 BallContext 对象，不是 gstsServer 函数
+const newState = nextState(ballCtx)
+```
+编译后的 JSON 中 `newState` 被硬编码为 `{"type": "int", "value": 0}`（永远 S_STILL），球的 `nextState` 转移逻辑完全丢失 → **球永远不会动**。
+
+**根因**：编译器看到 `nextState(ballCtx)` 这个跨文件调用时：
+- `nextState` 没有 `gstsServer` 前缀 → 编译器不知道它是游戏引擎函数
+- `ballCtx` 是对象字面量（包含多个运行时 local variable 的值）→ 编译器无法将其序列化为信号参数
+- 结果：**静默丢弃，返回值 = 默认值**，不报编译错误
+
+**为什么其他跨文件函数（exitStill、doRoll 等）没这个问题？**
+- `exitStill(f)` — 参数是简单的 `f`（any 类型），编译器可以追踪并内联
+- `doRoll(f)` — 同理，单个简单参数
+- `nextState(ballCtx)` — 参数是**对象字面量**，编译器无法追踪对象字段的来源
+
+**修复方案**：
+```typescript
+// ✅ 正确：gstsServer 前缀 + 独立原始参数（不能传对象！）
+export function gstsServerNextState(
+  state: bigint,
+  xzSpeed: number,
+  ballVy: number,
+  ballY: number,
+  ballRadius: number,
+  nearestPlayerDist: number,
+  distFromLocker: number
+): bigint {
+  // 单一 trailing return，可以用 const 中间变量
+  const groundState = bool(xzSpeed < 0.5) ? S_STILL : (bool(xzSpeed < 7.0) ? S_ROLL : S_SLIDE)
+  const exited = bool(bool(distFromLocker > 2.0) && bool(state === S_LOCK))
+  // ... 其他守卫条件
+  return exited ? groundState : entered ? S_LOCK : /* ... */ : state
+}
+```
+
+调用侧：
+```typescript
+const newState = gstsServerNextState(
+  currentState, xzSpeed, ballVy, ballY, ballRadius,
+  nearestPlayerDist, distFromLockerVal
+)
+```
+
+**验证方法**：编译后检查 `dist/src/main2.json`，搜索 `set_local_variable` 节点——如果 `newState` 对应节点的值是 `{"type": "conn", ...}`（连接其他节点的输出）而非 `{"type": "int", "value": 0}`（硬编码），则函数调用被正确内联。
+
+**gstsServer 约束要点**：
+- 必须是**顶层函数**（不能嵌套在 `g.server().on(...)` 内）
+- 参数必须是**普通标识符**（不能解构、不能是对象/数组）
+- 只能有**一个尾部的 `return <expr>`**（但可以有 `const` 中间变量）
+- 内部调试日志需要用 `print(str(...))` 而非 `log(f, ...)`（无 `f` 参数）
+- 跨文件调用时，编译器会自动**内联**整个 gstsServer 函数的节点图到调用方
+
+**关联**：此问题与 7.10（守卫函数是纯 TS 函数）和 7.24（enterLock/exitLock 内联）属于同一根因的不同表现——编译器对跨文件函数调用的处理能力有限，当遇到无法处理的情况时会静默失败而非报错。<!-- Agent Touyu 2026-05-27 -->
+
 ---
 
 ## 8. 当前进度
 
 | 文件 | 状态 | 负责 Agent | 备注 |
 |------|------|-----------|------|
-| `stateMachine.ts` | 已完成 | Agent A | Phase 1，已完成状态枚举+BallContext+7守卫+nextState+entry/exit |<!-- Agent A 2026-05-27 -->
+| `stateMachine.ts` | 已完成 | Agent A | Phase 1，状态枚举+BallContext+7守卫+nextState+gstsServerNextState+entry/exit |<!-- Agent A 2026-05-27，更新 Agent Touyu 2026-05-27 -->
 | `ball_physics.ts` | 已完成 | Agent B | doStill/doRoll/doSlide/doAir/doLock 全部实现，通过 typecheck + lint（仅含 any 警告） |<!-- Agent B 2026-05-27 -->
 | `collision.ts` | 已完成 | Agent C | 地面碰撞 + 球员碰撞，反射公式实现，通过 typecheck + lint |<!-- Agent C 2026-05-27 -->
 | `player_fsm.ts` | 已完成 | Agent D | Phase 5，骨架：状态枚举+PlayerContext+playerNextState（转移逻辑后续填充） |<!-- Agent D 2026-05-27 -->

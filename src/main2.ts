@@ -20,7 +20,7 @@ import {
   exitRoll,
   exitSlide,
   exitStill,
-  nextState,
+  gstsServerNextState,
   S_AIR,
   S_LOCK,
   S_ROLL,
@@ -39,7 +39,8 @@ g.server({
   name: 'Ball_主控',
   lang: 'zh',
   variables: {
-    _init: false
+    _init: false,
+    _diagTick: 0n
   }
 })
   .on('实体创建时', (_evt, f) => {
@@ -68,12 +69,16 @@ g.server({
     f.设置自定义变量(self, 'nearestPlayerDist', 999.0)
     f.设置自定义变量(self, '状态', S_STILL)
 
+    // Debug 视觉反馈变量（初始化 0.0，用户设为非零值触发闪烁）
+    f.设置自定义变量(self, '_debugFlash0', 0.0)
+    f.设置自定义变量(self, '_debugFlash1', 0.0)
+
     // 启动 motionTick 循环定时器（120ms 间隔）
     f.启动定时器(self, 'motionTick', true, [0.12])
   })
   .on('定时器触发时', (evt, f) => {
-    // 只处理 motionTick 事件
-    if (bool(evt.timerName != 'motionTick')) {
+    // 只处理 motionTick（正常循环）和 debugStepTick（调试单步）事件
+    if (bool(evt.timerName != 'motionTick' && evt.timerName != 'debugStepTick')) {
       return
     }
 
@@ -113,7 +118,6 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByEntity,
-      ballSelf: self,
       nearestPlayerId: 0n, // unused by guards; real value read inline in enterLock
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerVal
@@ -145,17 +149,24 @@ g.server({
     // ============================================================
 
     // ============================================================
-    // 3.5 调试日志：球员在 5m 内时打印诊断信息
+    // 3.5 调试日志：球员在 5m 内时打印诊断信息（节流 ~1.2s/次）
     //     帮助定位「球不动」原因：确认状态、速度、距离等关键值
     // ============================================================
-    if (bool(nearestPlayerDist < 5.0)) {
+    const diagTick = f.获取节点图变量自动类型推断('_diagTick')
+    const nextTick = diagTick + 1n
+    f.设置节点图变量自动类型推断('_diagTick', bool(nextTick >= 20n) ? 0n : nextTick)
+    if (bool(bool(nearestPlayerDist < 5.0) && bool(diagTick >= 19n))) {
       log(f, '诊断', ['诊断 状态=', str(currentState), ' xz=', str(xzSpeed), ' 最近=', str(nearestPlayerDist), ' 距锁=', str(distFromLockerVal)])
     }
 
     // ============================================================
-    // 4. nextState — 按优先级 1→7 检查守卫，返回目标状态
+    // 4. gstsServerNextState — 按优先级 1→7 检查守卫，返回目标状态
+    //    使用 gstsServer 标记的跨文件调用，独立原始参数
     // ============================================================
-    const newState = nextState(ballCtx)
+    const newState = gstsServerNextState(
+      currentState, xzSpeed, ballVy, ballY, ballRadius,
+      nearestPlayerDist, distFromLockerVal
+    )
 
     // ============================================================
     // 5. exit 旧状态 / enter 新状态
@@ -285,8 +296,8 @@ g.server({
   lang: 'zh'
 })
   .on('实体创建时', (_evt, f) => {
-    // 启动 playerScanTick 循环定时器（500ms 间隔，无需每 tick 扫描）
-    f.启动定时器(self, 'playerScanTick', true, [0.5])
+    // 启动 playerScanTick 循环定时器（1s 间隔，无需每 tick 扫描）
+    f.启动定时器(self, 'playerScanTick', true, [1.0])
   })
   .on('定时器触发时', (evt, f) => {
     // 只处理 playerScanTick 事件
@@ -402,5 +413,45 @@ g.server({
     // ============================================================
     if (bool(allowModifier(newBase, playerModifier))) {
       applyModifier(f, newBase, playerModifier)
+    }
+  })
+
+// ============================================================
+// Graph 5: Ball_Debug视觉 (ID 1073742444, 挂载足球实体)
+// 职责：调试单步执行 — 暂停/恢复定时器 + 逐帧步进
+//
+//  _debugFlash0 变化 → 暂停循环 → 触发一步（走一轮状态机）
+//  _debugFlash1 变化 → 恢复循环定时器（回到正常 120ms 运行）
+//
+// 用户用法：
+//   f.设置自定义变量(self, '_debugFlash0', 1.0, true)  // 步进一次
+//   f.设置自定义变量(self, '_debugFlash1', 1.0, true)  // 恢复运行
+// ============================================================
+
+g.server({
+  id: 1073742444,
+  name: 'Ball_Debug视觉',
+  lang: 'zh'
+})
+  .on('自定义变量变化时', (evt, f) => {
+    // 快速过滤：只处理 _debugFlash0 / _debugFlash1，其余立即返回
+    const notFlash0 = bool(evt.variableName != '_debugFlash0')
+    const notFlash1 = bool(evt.variableName != '_debugFlash1')
+    if (bool(notFlash0 && notFlash1)) {
+      return
+    }
+
+    if (bool(evt.variableName == '_debugFlash0')) {
+      // == 步进模式 ==
+      // 1. 暂停循环定时器（停止自动运行）
+      f.暂停定时器(self, 'motionTick')
+      // 2. 启动一次性 debugStepTick（0.01s 后触发）
+      //    Ball_主控的定时器 handler 同时响应 motionTick 和 debugStepTick
+      //    debugStepTick 触发一轮状态机后自动结束，不会重启
+      f.启动定时器(self, 'debugStepTick', false, [0.01])
+    } else {
+      // == 恢复模式 ==
+      // 恢复被暂停的循环定时器
+      f.恢复定时器(self, 'motionTick')
     }
   })

@@ -399,7 +399,6 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByEntity,
-      ballSelf: self,
       nearestPlayerId: 0n,
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerComputed

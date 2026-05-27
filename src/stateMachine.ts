@@ -47,10 +47,8 @@ export interface BallContext {
   angularVz: number
   /** 球半径（0.45m） */
   ballRadius: number
-  /** 锁定此球的球员实体 ID，等于 ballSelf 表示自由（未被锁定） */
+  /** 锁定此球的球员实体（仅在进入 LOCK 时内联写入自定义变量） */
   lockedBy: entity
-  /** 球自身实体引用（用于判断 lockedBy 是否等于 ballSelf = 自由） */
-  ballSelf: entity
   /** 最近球员的实体 ID */
   nearestPlayerId: bigint
   /** 最近球员距离（米） */
@@ -76,11 +74,13 @@ export function canExitLock(ctx: BallContext): boolean {
 
 /**
  * 优先级 2：进入锁定
- * 条件：球未被锁定 且 最近球员距离 < 0.5m 且 水平速率 < 2.0
+ * 条件：最近球员距离 < 0.5m 且 水平速率 < 2.0
  * 目标：S_LOCK
+ *
+ * 注意：不检查 entity 比较 — 纯 TS 函数中 entity === 编译为引用比较，不生成 GIA equal 节点
  */
 export function canEnterLock(ctx: BallContext): boolean {
-  return bool(ctx.lockedBy == ctx.ballSelf && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
+  return bool(ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
 }
 
 /**
@@ -199,6 +199,50 @@ export function nextState(ctx: BallContext): bigint {
   }
   // 默认：保持当前状态不变
   return ctx.state
+}
+
+// ============================================================
+// 2.5b gstsServerNextState — 供节点图跨文件调用
+//     gstsServer 前缀标记，独立原始参数，单一 return 表达式
+//     内联所有守卫逻辑和 dispatchGroundState
+// ============================================================
+
+export function gstsServerNextState(
+  state: bigint,
+  xzSpeed: number,
+  ballVy: number,
+  ballY: number,
+  ballRadius: number,
+  nearestPlayerDist: number,
+  distFromLocker: number
+): bigint {
+  const groundState = bool(xzSpeed < 0.5) ? S_STILL : (bool(xzSpeed < 7.0) ? S_ROLL : S_SLIDE)
+  const exited = bool(bool(distFromLocker > 2.0) && bool(state === S_LOCK))
+  const entered = bool(bool(nearestPlayerDist < 0.5) && bool(xzSpeed < 2.0))
+  const airborne = bool(
+    bool(bool(state === S_STILL) || bool(state === S_ROLL) || bool(state === S_SLIDE)) && bool(ballVy > 0.0)
+  )
+  const landed = bool(bool(state === S_AIR) && bool(ballY <= ballRadius) && bool(ballVy <= 0.0))
+  const still = bool(bool(bool(state === S_ROLL) || bool(state === S_SLIDE)) && bool(xzSpeed < 0.1))
+  const roll = bool(
+    bool(bool(state === S_SLIDE) || bool(state === S_AIR)) &&
+    bool(xzSpeed >= 0.1) &&
+    bool(xzSpeed < 4.0) &&
+    bool(ballY <= ballRadius)
+  )
+  const slide = bool(
+    bool(bool(state === S_ROLL) || bool(state === S_STILL) || bool(state === S_AIR)) &&
+    bool(xzSpeed >= 7.0) &&
+    bool(ballY <= ballRadius)
+  )
+  return exited ? groundState
+    : entered ? S_LOCK
+    : airborne ? S_AIR
+    : landed ? groundState
+    : still ? S_STILL
+    : roll ? S_ROLL
+    : slide ? S_SLIDE
+    : state
 }
 
 // ============================================================
