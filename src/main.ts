@@ -8,6 +8,7 @@ import { gstsServer切换至锁定 } from './motion'
 
 g.server({
   id: 1073742432,
+  name: 'Main_调度器',
   lang: 'zh',
   variables: {
     _init: false,
