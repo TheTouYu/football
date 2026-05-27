@@ -442,3 +442,65 @@ const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity"
 | `main.ts` | 旧架构 | — | src_old/main.ts，仅作参考 |
 | `main2.ts` | 已完成 | Agent Touyu | 4 Graph 架构：主控+物理+扫描+Player FSM，列表迭代循环扫描 |
 | `main3.ts` | 已完成 | Agent Touyu | 2 Graph 架构：Ball FSM（8索引扫描+内联碰撞）+ Player FSM |
+
+---
+
+## 9. 信号日志系统
+
+### 9.1 信号发送 API
+
+```typescript
+// 节点图函数（f 的方法）
+f.sendSignal(signalName: StrValue, ...args: value[]): void
+
+// 中文别名
+f.发送信号(signalName: StrValue, ...args: value[]): void
+```
+
+- `signalName`：仅支持字面量字符串，须先在编辑器的信号管理器中注册
+- `...args`：必须是 `value` 类型（`str`/`int`/`float`/`entity`/`vec3` 等 class 的实例）
+
+### 9.2 类型陷阱：`str()` 返回 `string` 而非 `str value`
+
+全局函数 `str(x)` 返回的是原生 JS `string` 类型，不是 `str` value class 的实例（来自 `server_globals.d.ts: str: (v: ...) => string`）。
+
+而节点图函数 `f.拼装列表` 接受 `StrValue[]`（`StrValue = str | string`），所以 `str(x)` 的返回值可以用在拼装列表中。
+
+### 9.3 日志信号的标准用法（V2 架构）
+
+```typescript
+// 模式：信号名 + 通道 + 字符串列表（as any 绕过 type 检查）
+f.发送信号('日志操作', '物理' as any, f.拼装列表(['地面碰撞 Vy=', str(ballVy), '→', str(bouncedVy)]) as any)
+f.发送信号('日志操作', '状态机' as any, f.拼装列表(['状态 ', str(currentState), '→', str(newState)]) as any)
+f.发送信号('日志操作', '锁定' as any, f.拼装列表(['进入锁定 距离=', str(nearestPlayerDist)]) as any)
+f.发送信号('日志操作', '锁定' as any, f.拼装列表(['LOCK踢球']) as any)
+```
+
+参数结构：
+
+| 位置 | 说明 | 类型 |
+|------|------|------|
+| arg1 | 信号名，须编辑器注册 | `StrValue`（字面量） |
+| arg2 | 通道名：`'物理'` / `'状态机'` / `'锁定'` | 传给 `value`，需 `as any` |
+| arg3 | 日志内容字符串列表，用 `f.拼装列表` 构建 | `string[]`，需 `as any` |
+
+### 9.4 为什么用 `f.拼装列表` 而非字符串拼接
+
+GIA 节点图中不支持 `+` 运算符做字符串拼接（`addition` 只支持数值类型）。`str("a") + str("b")` 会报错：
+
+```
+Error: Generic parameter not matched: str type × addition numeric overload
+```
+
+正确做法是将所有日志片段用 `f.拼装列表` 组装为字符串列表，接收端收到后逐项解析拼成完整日志。
+
+### 9.5 已接入日志的触发点（main2.ts V2 架构）
+
+| 触发点 | 通道 | 列表内容 |
+|--------|------|---------|
+| 地面碰撞发生 | `'物理'` | `['地面碰撞 Vy=', oldVy, '→', newVy]` |
+| 状态转移发生 | `'状态机'` | `['状态 ', oldState, '→', newState]` |
+| 进入 LOCK 锁定 | `'锁定'` | `['进入锁定 距离=', nearestPlayerDist]` |
+| 退出 LOCK 锁定 | `'锁定'` | `['退出锁定 距锁定者=', distFromLocker]` |
+
+状态编号映射：`0=静止` `1=滚动` `2=滑动` `3=空中` `4=锁定`
