@@ -136,16 +136,16 @@ g.server({
     // 1. 读取足球基本自定义变量
     // ==========================================================
 
-    const ballVx = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-    const ballVy = f.数据类型转换(f.获取自定义变量(self, 'ballVy'), 'float')
-    const ballVz = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
-    const ballY = f.数据类型转换(f.获取自定义变量(self, 'ballY'), 'float')
-    const angularVx = f.数据类型转换(f.获取自定义变量(self, 'angularVx'), 'float')
-    const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
-    const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
-    const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
+    const ballVx = f.获取自定义变量(self, 'ballVx').asType('float')
+    const ballVy = f.获取自定义变量(self, 'ballVy').asType('float')
+    const ballVz = f.获取自定义变量(self, 'ballVz').asType('float')
+    const ballY = f.获取自定义变量(self, 'ballY').asType('float')
+    const angularVx = f.获取自定义变量(self, 'angularVx').asType('float')
+    const angularVy = f.获取自定义变量(self, 'angularVy').asType('float')
+    const angularVz = f.获取自定义变量(self, 'angularVz').asType('float')
+    const ballRadius = f.获取自定义变量(self, 'ballRadius').asType('float')
     const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType('entity')
-    const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
+    const currentState = f.获取自定义变量(self, '状态').asType('int')
 
     // 派生：xzSpeed
     const xzSpeed = f.三维向量模运算(f.创建三维向量(ballVx, 0.0, ballVz))
@@ -380,7 +380,7 @@ g.server({
     // 4. 读取 distFromLocker（由 doLock 维护）
     // ==========================================================
 
-    const distFromLockerComputed = f.数据类型转换(f.获取自定义变量(self, 'distFromLocker'), 'float')
+    const distFromLockerComputed = f.获取自定义变量(self, 'distFromLocker').asType('float')
 
     // ==========================================================
     // 5. 组装 BallContext 快照
@@ -499,9 +499,9 @@ g.server({
     const balls = f.获取场上指定元件ID的实体(prefabId(1077936262))
     const ball = balls[0]
 
-    const playerState = f.数据类型转换(f.获取自定义变量(self, 'playerState'), 'int')
-    const playerModifier = f.数据类型转换(f.获取自定义变量(self, 'playerModifier'), 'int')
-    const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
+    const playerState = f.获取自定义变量(self, 'playerState').asType('int')
+    const playerModifier = f.获取自定义变量(self, 'playerModifier').asType('int')
+    const ballState = f.获取自定义变量(ball, '状态').asType('int')
     const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType('entity')
 
     const selfLocRot = f.获取实体位置与旋转(self)

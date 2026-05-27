@@ -39,8 +39,8 @@ const BOUNCE_DECAY = 0.5
  */
 export function checkGroundCollision(f: any): boolean {
   // 读取球的高度和垂直速度
-  const ballY = f.数据类型转换(f.获取自定义变量(self, 'ballY'), 'float')
-  const ballVy = f.数据类型转换(f.获取自定义变量(self, 'ballVy'), 'float')
+  const ballY = f.获取自定义变量(self, 'ballY').asType('float')
+  const ballVy = f.获取自定义变量(self, 'ballVy').asType('float')
 
   // 条件：球触地且正在下落
   if (bool(ballY <= BALL_RADIUS && ballVy < 0.0)) {
@@ -97,9 +97,9 @@ export function checkPlayerCollision(f: any, playerEntity: any): boolean {
   // 条件：球到球员距离 < 碰撞半径
   if (bool(dist < collisionRadius)) {
     // 读取球当前速度（三个分量）
-    const ballVx = f.数据类型转换(f.获取自定义变量(ball, 'ballVx'), 'float')
-    const ballVy = f.数据类型转换(f.获取自定义变量(ball, 'ballVy'), 'float')
-    const ballVz = f.数据类型转换(f.获取自定义变量(ball, 'ballVz'), 'float')
+    const ballVx = f.获取自定义变量(ball, 'ballVx').asType('float')
+    const ballVy = f.获取自定义变量(ball, 'ballVy').asType('float')
+    const ballVz = f.获取自定义变量(ball, 'ballVz').asType('float')
 
     // 构建速度向量 V = (Vx, Vy, Vz)
     const vel = f.创建三维向量(ballVx, ballVy, ballVz)

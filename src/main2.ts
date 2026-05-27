@@ -82,20 +82,20 @@ g.server({
     //    nearestPlayerId/Dist 由 Graph 3（玩家扫描器）写入，直接读取
     // ============================================================
 
-    const ballVx = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-    const ballVy = f.数据类型转换(f.获取自定义变量(self, 'ballVy'), 'float')
-    const ballVz = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
-    const ballY = f.数据类型转换(f.获取自定义变量(self, 'ballY'), 'float')
-    const angularVx = f.数据类型转换(f.获取自定义变量(self, 'angularVx'), 'float')
-    const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
-    const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
-    const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
+    const ballVx = f.获取自定义变量(self, 'ballVx').asType('float')
+    const ballVy = f.获取自定义变量(self, 'ballVy').asType('float')
+    const ballVz = f.获取自定义变量(self, 'ballVz').asType('float')
+    const ballY = f.获取自定义变量(self, 'ballY').asType('float')
+    const angularVx = f.获取自定义变量(self, 'angularVx').asType('float')
+    const angularVy = f.获取自定义变量(self, 'angularVy').asType('float')
+    const angularVz = f.获取自定义变量(self, 'angularVz').asType('float')
+    const ballRadius = f.获取自定义变量(self, 'ballRadius').asType('float')
     const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType('entity')
-    const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
+    const currentState = f.获取自定义变量(self, '状态').asType('int')
     // nearestPlayerId 由 Graph 3 扫描写入（保持 entity 类型）
     // 不在此处声明局部变量 — 仅在进入 LOCK 时内联读取，避免 setLocalVariable 类型解析失败
-    const nearestPlayerDist = f.数据类型转换(f.获取自定义变量(self, 'nearestPlayerDist'), 'float')
-    const distFromLockerVal = f.数据类型转换(f.获取自定义变量(self, 'distFromLocker'), 'float')
+    const nearestPlayerDist = f.获取自定义变量(self, 'nearestPlayerDist').asType('float')
+    const distFromLockerVal = f.获取自定义变量(self, 'distFromLocker').asType('float')
 
     // 派生：水平速率
     const xzSpeed = f.三维向量模运算(f.创建三维向量(ballVx, 0.0, ballVz))
@@ -226,7 +226,7 @@ g.server({
     }
 
     // 读取当前状态（由 Graph 1 写入），根据状态调用对应 do 函数
-    const state = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
+    const state = f.获取自定义变量(self, '状态').asType('int')
 
     if (bool(state == S_STILL)) {
       doStill(f)
@@ -270,10 +270,7 @@ function 扫描球员回调(playerEntity: any, _breakLoop: any): void {
   const dist = gsts.f._3dVectorModuloOperation(diff)
 
   // 读取当前最近距离
-  const currNearest = gsts.f.dataTypeConversion(
-    gsts.f.getCustomVariable(self, 'nearestPlayerDist'),
-    'float'
-  )
+  const currNearest = gsts.f.getCustomVariable(self, 'nearestPlayerDist').asType('float')
 
   // 如果更近，更新最近球员
   if (bool(dist < currNearest)) {
@@ -309,7 +306,7 @@ g.server({
     f.列表迭代循环(players, 扫描球员回调)
 
     // 日志：扫描结果 — 确认扫描器是否找到球员以及距离
-    const scanDist = f.数据类型转换(f.获取自定义变量(self, 'nearestPlayerDist'), 'float')
+    const scanDist = f.获取自定义变量(self, 'nearestPlayerDist').asType('float')
     log(f, '扫描', ['扫描 最近球员 距离=', str(scanDist)])
   })
 
@@ -358,11 +355,11 @@ g.server({
     const ball = balls[0]
 
     // 读自身球员变量
-    const playerState = f.数据类型转换(f.获取自定义变量(self, 'playerState'), 'int')
-    const playerModifier = f.数据类型转换(f.获取自定义变量(self, 'playerModifier'), 'int')
+    const playerState = f.获取自定义变量(self, 'playerState').asType('int')
+    const playerModifier = f.获取自定义变量(self, 'playerModifier').asType('int')
 
     // 跨实体读足球变量
-    const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
+    const ballState = f.获取自定义变量(ball, '状态').asType('int')
     const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType('entity')
 
     // 计算自身到球的距离

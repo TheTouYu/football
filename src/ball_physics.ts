@@ -63,10 +63,10 @@ export function doStill(_f: any): void {
  */
 export function doRoll(f: any): void {
   // 1. 读取变量
-  const ballVxRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-  const ballVzRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
-  const frictionDecay = f.数据类型转换(f.获取自定义变量(self, 'frictionDecay'), 'float')
-  const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
+  const ballVxRaw = f.获取自定义变量(self, 'ballVx').asType('float')
+  const ballVzRaw = f.获取自定义变量(self, 'ballVz').asType('float')
+  const frictionDecay = f.获取自定义变量(self, 'frictionDecay').asType('float')
+  const ballRadius = f.获取自定义变量(self, 'ballRadius').asType('float')
 
   // 2. 摩擦衰减 — 用 raw 值构建 vec3，再用 三维向量缩放 做衰减（避免 float * float 的 GIA 类型问题）
   const rawHorizVel = f.创建三维向量(ballVxRaw, 0.0, ballVzRaw)
@@ -109,13 +109,13 @@ export function doRoll(f: any): void {
  */
 export function doSlide(f: any): void {
   // 1. 读取变量
-  const ballVxRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-  const ballVzRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
-  const frictionDecay = f.数据类型转换(f.获取自定义变量(self, 'frictionDecay'), 'float')
-  const angularVxRaw = f.数据类型转换(f.获取自定义变量(self, 'angularVx'), 'float')
-  const angularVyRaw = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
-  const angularVzRaw = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
-  const angularDecay = f.数据类型转换(f.获取自定义变量(self, 'angularDecay'), 'float')
+  const ballVxRaw = f.获取自定义变量(self, 'ballVx').asType('float')
+  const ballVzRaw = f.获取自定义变量(self, 'ballVz').asType('float')
+  const frictionDecay = f.获取自定义变量(self, 'frictionDecay').asType('float')
+  const angularVxRaw = f.获取自定义变量(self, 'angularVx').asType('float')
+  const angularVyRaw = f.获取自定义变量(self, 'angularVy').asType('float')
+  const angularVzRaw = f.获取自定义变量(self, 'angularVz').asType('float')
+  const angularDecay = f.获取自定义变量(self, 'angularDecay').asType('float')
 
   // 2. 线速度摩擦衰减 — 用三维向量缩放代替 float * float 避免 GIA 类型问题
   const rawHorizVel = f.创建三维向量(ballVxRaw, 0.0, ballVzRaw)
@@ -164,15 +164,15 @@ export function doSlide(f: any): void {
  */
 export function doAir(f: any): void {
   // 1. 读取变量（全部 const，避免 let 突变导致的跨文件 GIA 类型解析问题）
-  const ballVxOld = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-  const ballVzOld = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
-  const ballVyOld = f.数据类型转换(f.获取自定义变量(self, 'ballVy'), 'float')
-  const ballYOld = f.数据类型转换(f.获取自定义变量(self, 'ballY'), 'float')
-  const airResistance = f.数据类型转换(f.获取自定义变量(self, 'airResistance'), 'float')
-  const gravity = f.数据类型转换(f.获取自定义变量(self, 'gravity'), 'float')
-  const angularVxOld = f.数据类型转换(f.获取自定义变量(self, 'angularVx'), 'float')
-  const angularVyOld = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
-  const angularVzOld = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
+  const ballVxOld = f.获取自定义变量(self, 'ballVx').asType('float')
+  const ballVzOld = f.获取自定义变量(self, 'ballVz').asType('float')
+  const ballVyOld = f.获取自定义变量(self, 'ballVy').asType('float')
+  const ballYOld = f.获取自定义变量(self, 'ballY').asType('float')
+  const airResistance = f.获取自定义变量(self, 'airResistance').asType('float')
+  const gravity = f.获取自定义变量(self, 'gravity').asType('float')
+  const angularVxOld = f.获取自定义变量(self, 'angularVx').asType('float')
+  const angularVyOld = f.获取自定义变量(self, 'angularVy').asType('float')
+  const angularVzOld = f.获取自定义变量(self, 'angularVz').asType('float')
 
   // 2. 重力加速度 * tick 间隔（dt = 0.12s）— 用 vec3 缩放代替 float * float
   const gravityVec3 = f.创建三维向量(0.0, gravity, 0.0)
@@ -256,8 +256,8 @@ export function doAir(f: any): void {
  */
 export function doLock(f: any, lockerEntity: any): void {
   // 1. 读取变量
-  const ballVxRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVx'), 'float')
-  const ballVzRaw = f.数据类型转换(f.获取自定义变量(self, 'ballVz'), 'float')
+  const ballVxRaw = f.获取自定义变量(self, 'ballVx').asType('float')
+  const ballVzRaw = f.获取自定义变量(self, 'ballVz').asType('float')
 
   // 判断球是否接近静止（刚进入锁定的第一帧）
   const xzSpeed = f.三维向量模运算(f.创建三维向量(ballVxRaw, 0.0, ballVzRaw))
@@ -291,7 +291,7 @@ export function doLock(f: any, lockerEntity: any): void {
   } else {
     // 3. 球已在运动中：摩擦衰减 + 计算与锁定者的距离
 
-    const frictionDecay = f.数据类型转换(f.获取自定义变量(self, 'frictionDecay'), 'float')
+    const frictionDecay = f.获取自定义变量(self, 'frictionDecay').asType('float')
 
     // 线速度摩擦衰减 — 用三维向量缩放代替 float * float
     const rawVel = f.创建三维向量(ballVxRaw, 0.0, ballVzRaw)
