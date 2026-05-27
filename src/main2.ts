@@ -205,6 +205,11 @@ g.server({
     }
 
     // 注意：不在此处调用 doXxx() — 物理执行由 Graph 2 负责
+
+    // 重新拉起 motionTick 循环定时器
+    // 关键：Ball_Debug视觉可能将 motionTick 替换为一次性定时器以触发即时 tick
+    //       此处确保每次 tick 后循环定时器持续运行
+    f.启动定时器(self, 'motionTick', true, [0.12])
   })
 
 // ============================================================
@@ -410,9 +415,11 @@ g.server({
 
 // ============================================================
 // Graph 5: Ball_Debug视觉 (ID 1073742444, 挂载足球实体)
-// 职责：监听 debug 自定义变量变化 → 触发一帧视觉闪烁
-//       用户通过 f.设置自定义变量(self, '_debugFlash0', <任意值>, true)
-//       触发视觉反馈（球模型闪烁一次，用于调试状态机判断）
+// 职责：监听 debug 自定义变量变化 → 触发一次即时 motionTick
+//       用户通过 f.设置自定义变量(self, '_debugFlash0', <任意值>, true) 触发
+//       原理：将 motionTick 定时器替换为 0.01s 一次性定时器
+//             → 立即走一轮 Ball_主控的 tick handler
+//             → tick handler 末尾重新拉起 0.12s 循环定时器
 // ============================================================
 
 g.server({
@@ -428,14 +435,10 @@ g.server({
       return
     }
 
-    // 触发一帧视觉闪烁：隐藏模型 → 0.05s 后恢复
-    // 激活关闭模型显示: true=可见, false=不可见
-    f.激活关闭模型显示(self, false as any)
-    f.启动定时器(self, 'debugFlashRestore', false, [0.05])
-  })
-  .on('定时器触发时', (evt, f) => {
-    if (bool(evt.timerName != 'debugFlashRestore')) {
-      return
-    }
-    f.激活关闭模型显示(self, true as any)
+    // 触发一次即时 motionTick：
+    // 将 motionTick 定时器替换为 0.01s 一次性定时器
+    // 同名定时器会覆盖旧定时器 → 原 0.12s 循环定时器被替换
+    // 0.01s 后 motionTick 触发 → Ball_主控运行一轮状态机
+    // Ball_主控的 tick handler 末尾会重新拉起 0.12s 循环定时器
+    f.启动定时器(self, 'motionTick', false, [0.01])
   })
