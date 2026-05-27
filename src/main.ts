@@ -60,7 +60,7 @@ g.server({
     }
 
     // 4. 读球状态 — 若在锁定中(5)则跳过
-    let ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
+    let ballState = f.获取自定义变量(ball, '状态').asType('int')
     if (bool(ballState == 5n)) {
       return
     }
@@ -70,8 +70,8 @@ g.server({
     let ballPos = ballLocRot.location
 
     // 6. 冷却检查
-    let lastKickTick = f.数据类型转换(f.获取自定义变量(ball, 'lastKickTick'), 'int')
-    let kickCooldown = f.数据类型转换(f.获取自定义变量(ball, 'kickCooldown'), 'int')
+    let lastKickTick = f.获取自定义变量(ball, 'lastKickTick').asType('int')
+    let kickCooldown = f.获取自定义变量(ball, 'kickCooldown').asType('int')
     let tickSinceKick = tc - lastKickTick
     if (bool(tickSinceKick < kickCooldown)) {
       return
