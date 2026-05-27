@@ -113,7 +113,6 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByEntity,
-      ballSelf: self,
       nearestPlayerId: 0n, // unused by guards; real value read inline in enterLock
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerVal
