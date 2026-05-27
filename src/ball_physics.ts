@@ -289,15 +289,15 @@ export function doLock(f: any, lockerEntity: any): void {
 
     const frictionDecay = f.数据类型转换(f.获取自定义变量(self, 'frictionDecay'), 'float')
 
-	    // 线速度摩擦衰减 — 用三维向量缩放代替 float * float
-	    const rawVel = f.创建三维向量(ballVxRaw, 0.0, ballVzRaw)
-	    const decayedVel = f.三维向量缩放(rawVel, frictionDecay)
-	    const decayedComps = f.拆分三维向量(decayedVel)
-	    const ballVx = decayedComps.xComponent
-	    const ballVz = decayedComps.zComponent
+    // 线速度摩擦衰减 — 用三维向量缩放代替 float * float
+    const rawVel = f.创建三维向量(ballVxRaw, 0.0, ballVzRaw)
+    const decayedVel = f.三维向量缩放(rawVel, frictionDecay)
+    const decayedComps = f.拆分三维向量(decayedVel)
+    const ballVx = decayedComps.xComponent
+    const ballVz = decayedComps.zComponent
 
-	    // 施加直线运动器（衰减后的水平速度）
-	    f.addUniformBasicLinearMotionDevice(self, 'ballLinear', 0.24, decayedVel)
+    // 施加直线运动器（衰减后的水平速度）
+    f.addUniformBasicLinearMotionDevice(self, 'ballLinear', 0.24, decayedVel)
 
     // 计算球到锁定者的距离（供守卫 canExitLock 检查 distFromLocker > 2m）
     const ballLocRot = f.获取实体位置与旋转(self)

@@ -2,7 +2,7 @@
 // 4 个 g.server() 调用：Ball_主控、Ball_物理、Ball_玩家扫描、Player_FSM
 // 按 docs/STATE_MACHINE_DESIGN_ZH.md 第 1 节架构 + 第 6 节挂载方案
 // 不参考 src_old/ 的任何代码
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 // ↑ f: any 是 genshin-ts 标准模式，中文函数名无 TS 类型声明；所有赋值来自 any 类型 API 返回值
 
 import { g } from 'genshin-ts-touyu/runtime/core'
@@ -89,7 +89,7 @@ g.server({
     const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
     const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
     const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
-    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity")
+    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType('entity')
     const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
     // nearestPlayerId 由 Graph 3 扫描写入（保持 entity 类型）
     // 不在此处声明局部变量 — 仅在进入 LOCK 时内联读取，避免 setLocalVariable 类型解析失败
@@ -112,6 +112,7 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByEntity,
+      ballSelf: self,
       nearestPlayerId: 0n, // unused by guards; real value read inline in enterLock
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerVal
@@ -175,7 +176,12 @@ g.server({
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
         // 内联 enterLock：内联读取 nearestPlayerId 避免 setLocalVariable 类型解析失败
-        f.设置自定义变量(self, 'lockedBy', f.获取自定义变量(self, 'nearestPlayerId').asType("entity"), true)
+        f.设置自定义变量(
+          self,
+          'lockedBy',
+          f.获取自定义变量(self, 'nearestPlayerId').asType('entity'),
+          true
+        )
         f.设置自定义变量(self, '状态', S_LOCK, true)
       }
     }
@@ -216,7 +222,7 @@ g.server({
     } else if (bool(state == S_AIR)) {
       doAir(f)
     } else if (bool(state == S_LOCK)) {
-      const lockerEntity = f.获取自定义变量(self, 'nearestPlayerId').asType("entity")
+      const lockerEntity = f.获取自定义变量(self, 'nearestPlayerId').asType('entity')
       doLock(f, lockerEntity)
     }
   })
@@ -249,7 +255,10 @@ function 扫描球员回调(playerEntity: any, _breakLoop: any): void {
   const dist = gsts.f._3dVectorModuloOperation(diff)
 
   // 读取当前最近距离
-  const currNearest = gsts.f.dataTypeConversion(gsts.f.getCustomVariable(self, 'nearestPlayerDist'), 'float')
+  const currNearest = gsts.f.dataTypeConversion(
+    gsts.f.getCustomVariable(self, 'nearestPlayerDist'),
+    'float'
+  )
 
   // 如果更近，更新最近球员
   if (bool(dist < currNearest)) {
@@ -335,7 +344,7 @@ g.server({
 
     // 跨实体读足球变量
     const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
-    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType("entity")
+    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType('entity')
 
     // 计算自身到球的距离
     const selfLocRot = f.获取实体位置与旋转(self)

@@ -143,7 +143,7 @@ g.server({
     const angularVy = f.数据类型转换(f.获取自定义变量(self, 'angularVy'), 'float')
     const angularVz = f.数据类型转换(f.获取自定义变量(self, 'angularVz'), 'float')
     const ballRadius = f.数据类型转换(f.获取自定义变量(self, 'ballRadius'), 'float')
-    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity")
+    const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType('entity')
     const currentState = f.数据类型转换(f.获取自定义变量(self, '状态'), 'int')
 
     // 派生：xzSpeed
@@ -393,6 +393,7 @@ g.server({
       angularVz: angularVz,
       ballRadius: ballRadius,
       lockedBy: lockedByEntity,
+      ballSelf: self,
       nearestPlayerId: 0n,
       nearestPlayerDist: nearestPlayerDist,
       distFromLocker: distFromLockerComputed
@@ -492,7 +493,7 @@ g.server({
     const playerState = f.数据类型转换(f.获取自定义变量(self, 'playerState'), 'int')
     const playerModifier = f.数据类型转换(f.获取自定义变量(self, 'playerModifier'), 'int')
     const ballState = f.数据类型转换(f.获取自定义变量(ball, '状态'), 'int')
-    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType("entity")
+    const ballLockedBy = f.获取自定义变量(ball, 'lockedBy').asType('entity')
 
     const selfLocRot = f.获取实体位置与旋转(self)
     const selfPos = selfLocRot.location

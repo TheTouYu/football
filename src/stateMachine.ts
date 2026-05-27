@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 // ↑ f: any 是 genshin-ts 标准模式，中文函数名无 TS 类型声明，禁用 any 安全警告
 
-import { entity } from "genshin-ts-touyu/runtime/value"
+import { entity } from 'genshin-ts-touyu/runtime/value'
 
 // ============================================================
 // 2.1 状态枚举（bigint，必须带 n 后缀）
@@ -47,8 +47,10 @@ export interface BallContext {
   angularVz: number
   /** 球半径（0.45m） */
   ballRadius: number
-  /** 锁定此球的球员实体 ID，0n 表示自由（未被锁定） */
+  /** 锁定此球的球员实体 ID，等于 ballSelf 表示自由（未被锁定） */
   lockedBy: entity
+  /** 球自身实体引用（用于判断 lockedBy 是否等于 ballSelf = 自由） */
+  ballSelf: entity
   /** 最近球员的实体 ID */
   nearestPlayerId: bigint
   /** 最近球员距离（米） */
@@ -78,7 +80,7 @@ export function canExitLock(ctx: BallContext): boolean {
  * 目标：S_LOCK
  */
 export function canEnterLock(ctx: BallContext): boolean {
-  return bool(ctx.lockedBy === new entity && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
+  return bool(ctx.lockedBy === ctx.ballSelf && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
 }
 
 /**
@@ -119,9 +121,9 @@ export function canEnterStill(ctx: BallContext): boolean {
 export function canEnterRoll(ctx: BallContext): boolean {
   return bool(
     (ctx.state === S_SLIDE || ctx.state === S_AIR) &&
-    ctx.xzSpeed >= 0.1 &&
-    ctx.xzSpeed < 4.0 &&
-    ctx.ballY <= ctx.ballRadius
+      ctx.xzSpeed >= 0.1 &&
+      ctx.xzSpeed < 4.0 &&
+      ctx.ballY <= ctx.ballRadius
   )
 }
 
@@ -133,8 +135,8 @@ export function canEnterRoll(ctx: BallContext): boolean {
 export function canEnterSlide(ctx: BallContext): boolean {
   return bool(
     (ctx.state === S_ROLL || ctx.state === S_STILL || ctx.state === S_AIR) &&
-    ctx.xzSpeed >= 7.0 &&
-    ctx.ballY <= ctx.ballRadius
+      ctx.xzSpeed >= 7.0 &&
+      ctx.ballY <= ctx.ballRadius
   )
 }
 

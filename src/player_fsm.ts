@@ -3,7 +3,7 @@
 // 按 docs/STATE_MACHINE_DESIGN_ZH.md 第 4 节规范实现
 // 当前阶段：骨架。转移逻辑后续填充（涉及玩家输入和 AI 决策）
 
-import { entity } from "genshin-ts-touyu/runtime/value"
+import { entity } from 'genshin-ts-touyu/runtime/value'
 
 // ============================================================
 // 4.1 基础状态枚举（bigint，同一时刻只有 1 个 active）
