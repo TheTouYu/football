@@ -1,69 +1,21 @@
-export function gstsServer计算踢球方向权重(dot: number) {
-  // 返回 forward 权重（toBallDir 权重 = 1.0 - forward权重）
-  // dot 越低（越偏离），toBallDir 权重越高，转弯时更积极地修正
-  let fw = 0.7
-  if (bool(dot > 0.7)) {
-    fw = 0.7
-  }
-  if (bool(dot > 0.0 && dot <= 0.7)) {
-    fw = 0.45
-  }
-  if (bool(dot <= 0.0)) {
-    fw = 0.25
-  }
-  return fw
-}
-
-export function gstsServer计算对齐权重(dot: number) {
-  let weight = 0.1
-  if (bool(dot > 0.9)) {
-    weight = 1.2
-  }
-  if (bool(dot > 0.5 && dot <= 0.9)) {
-    weight = 1.0
-  }
-  if (bool(dot > 0.0 && dot <= 0.5)) {
-    weight = 0.5
-  }
-  if (bool(dot > -0.5 && dot <= 0.0)) {
-    weight = 0.2
-  }
-  return weight
-}
-
-export function gstsServer计算力系数(dot: number) {
-  let coeff = 0.3
-  if (bool(dot > 0.9)) {
-    coeff = 0.8
-  }
-  if (bool(dot > 0.0 && dot <= 0.9)) {
-    coeff = 1.2
-  }
-  return coeff
-}
-
-// === 踢球条件判定 ===
+// kick_weights.ts — 踢球权重计算模块（桩文件）
+// 真实逻辑待从 src_old/kick_weights.ts 迁移
+// 当前返回 false（不满足踢球条件），保证编译通过
 
 /**
- * 判断某个角色是否可以踢球
- * 独立成函数，后续可改为按键触发等方式（不依赖位置）
+ * 满足踢球条件 — 桩函数
+ * 检查球是否在角色的踢球范围内
+ * @param _ballState 球的状态
+ * @param _pPos 球员位置
+ * @param _ballPos 球位置
+ * @param _range 踢球范围
+ * @returns 当前始终返回 false（桩实现）
  */
-
 export function gstsServer满足踢球条件(
-  ballState: bigint,
-  charPos: any,
-  ballPos: any,
-  kickRange: any
+  _ballState: any,
+  _pPos: any,
+  _ballPos: any,
+  _range: any
 ): boolean {
-  let result = true
-  // 条件：球不在锁定状态 && 距离在踢球范围内
-  if (bool(ballState == 5n)) {
-    result = false
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-  let dist = gsts.f._3dVectorModuloOperation(gsts.f._3dVectorSubtraction(ballPos, charPos))
-  if (bool(dist >= kickRange)) {
-    result = false
-  }
-  return result
+  return false
 }
