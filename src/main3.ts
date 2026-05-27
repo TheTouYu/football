@@ -163,6 +163,8 @@ g.server({
       const newY = BALL_RADIUS + GROUND_EPSILON
       f.设置自定义变量(self, 'ballVy', newVy)
       f.设置自定义变量(self, 'ballY', newY)
+      // 日志：地面碰撞
+      f.发送信号('日志操作', '物理' as any, f.拼装列表(['地面碰撞 Vy=', str(ballVy), '→', str(newVy)]) as any)
     }
 
     // ==========================================================
@@ -370,6 +372,11 @@ g.server({
       f.设置自定义变量(self, 'ballVz', velComps.zComponent, true)
     }
 
+    // 日志：球员碰撞（本 tick 至少碰了一个球员）
+    if (bool(playerCollided)) {
+      f.发送信号('日志操作', '物理' as any, f.拼装列表(['球员碰撞']) as any)
+    }
+
     // ==========================================================
     // 4. 读取 distFromLocker（由 doLock 维护）
     // ==========================================================
@@ -410,6 +417,8 @@ g.server({
     // ==========================================================
 
     if (bool(newState != currentState)) {
+      // 日志：状态变化
+      f.发送信号('日志操作', '状态机' as any, f.拼装列表(['状态 ', str(currentState), '→', str(newState)]) as any)
       if (bool(currentState == S_STILL)) {
         exitStill(f)
       } else if (bool(currentState == S_ROLL)) {
@@ -421,6 +430,8 @@ g.server({
       } else if (bool(currentState == S_LOCK)) {
         // 内联 exitLock：lockedBy 用 self（球自身）= 自由
         f.设置自定义变量(self, 'lockedBy', self, true)
+        // 日志：退出锁定
+        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['退出锁定 距锁定者=', str(distFromLockerComputed)]) as any)
       }
 
       if (bool(newState == S_STILL)) {
@@ -432,6 +443,8 @@ g.server({
       } else if (bool(newState == S_AIR)) {
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
+        // 日志：进入锁定
+        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['进入锁定 距离=', str(nearestPlayerDist)]) as any)
         // 内联 enterLock：直接传 nearestPlayerEntity（scan 中追踪的实体引用）
         f.设置自定义变量(self, 'lockedBy', nearestPlayerEntity, true)
         f.设置自定义变量(self, '状态', S_LOCK, true)
@@ -517,6 +530,8 @@ g.server({
     const newBase = playerNextState(playerCtx)
 
     if (bool(newBase != playerState)) {
+      // 日志：球员状态变化
+      f.发送信号('日志操作', '状态机' as any, f.拼装列表(['球员状态 ', str(playerState), '→', str(newBase)]) as any)
       f.设置自定义变量(self, 'playerState', newBase, true)
     }
 
