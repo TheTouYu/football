@@ -80,7 +80,7 @@ export function canExitLock(ctx: BallContext): boolean {
  * 目标：S_LOCK
  */
 export function canEnterLock(ctx: BallContext): boolean {
-  return bool(ctx.lockedBy === ctx.ballSelf && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
+  return bool(ctx.lockedBy == ctx.ballSelf && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
 }
 
 /**
@@ -121,9 +121,9 @@ export function canEnterStill(ctx: BallContext): boolean {
 export function canEnterRoll(ctx: BallContext): boolean {
   return bool(
     (ctx.state === S_SLIDE || ctx.state === S_AIR) &&
-      ctx.xzSpeed >= 0.1 &&
-      ctx.xzSpeed < 4.0 &&
-      ctx.ballY <= ctx.ballRadius
+    ctx.xzSpeed >= 0.1 &&
+    ctx.xzSpeed < 4.0 &&
+    ctx.ballY <= ctx.ballRadius
   )
 }
 
@@ -135,8 +135,8 @@ export function canEnterRoll(ctx: BallContext): boolean {
 export function canEnterSlide(ctx: BallContext): boolean {
   return bool(
     (ctx.state === S_ROLL || ctx.state === S_STILL || ctx.state === S_AIR) &&
-      ctx.xzSpeed >= 7.0 &&
-      ctx.ballY <= ctx.ballRadius
+    ctx.xzSpeed >= 7.0 &&
+    ctx.ballY <= ctx.ballRadius
   )
 }
 
