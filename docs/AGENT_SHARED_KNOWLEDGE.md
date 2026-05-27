@@ -341,8 +341,17 @@ npm run build      # 编译 + GIA + 注入
 ### 7.6 运动器 duration
 运动器 duration 设为 `0.24`（= 2 × tick 间隔），因为每个 tick 都会重新施加运动器，确保运动器不会在两次 tick 之间到期。
 
-### 7.7 lockedBy 用 entity 类型 + self 哨兵值表示「无锁定者」
-`BallContext.lockedBy` 现在使用 `entity` 类型（`import { entity } from "genshin-ts-touyu/runtime/value"`），哨兵值为 `self`（球自身实体 = 自由）。守卫 `canEnterLock` 中比较 `ctx.lockedBy === new entity`（已在 stateMachine.ts 实现）。自定义变量读写用 `.asType("entity")` 显式转换。`exitLock`/`enterLock` 必须内联以直接操作 entity 引用。<!-- Agent Touyu 2026-05-27，更新于 2026-05-27 -->
+### 7.7 lockedBy 用 entity 类型 + `canEnterLock` 不再做 entity 比较
+`BallContext.lockedBy` 使用 `entity` 类型。自定义变量读写用 `.asType("entity")` 显式转换。`exitLock`/`enterLock` 必须内联以直接操作 entity 引用。
+
+⚠️ **关键发现**：纯 TS 守卫函数（`canEnterLock`）中不能使用 `entity === entity` 做比较！纯函数中的 `===` 编译为 JS 引用比较，而 `.asType("entity")` 每次返回新包装对象，引用永远不等。也不会生成 GIA `equal(entity,entity)` 节点。
+
+**当前方案**：`canEnterLock` 直接不检查 entity 比较，仅依赖状态机优先级防止重复进入 S_LOCK：
+- S_LOCK 时先检查 `canExitLock`（优先级 1），不满足才轮到 `canEnterLock`
+- 即使 `canEnterLock` 返回 S_LOCK（与当前状态相同），`newState != currentState` 为 false，不执行 exit/enter
+- `doLock` 由独立 Graph（Ball_物理）持续运行，不受影响
+
+相关自定义变量（`lockedBy`、`distFromLocker`）在 `exitLock`/`enterLock` 时由 handler 内联维护。<!-- Agent Touyu 2026-05-27，更新于 2026-05-27 -->
 
 ### 7.8 `f.停止并删除基础运动器` 的第三个参数
 `f.停止并删除基础运动器(self, '<任意名称>', true)` — 第三个参数 `true` 表示删除该实体上**所有**基础运动器，此时第二个参数（名称）无关紧要。exit 函数中可用此 API 一次性清理所有运动器。<!-- Agent A 2026-05-27 -->
@@ -351,7 +360,14 @@ npm run build      # 编译 + GIA + 注入
 genshin-ts 的中文函数名（`设置自定义变量`、`停止并删除基础运动器` 等）没有 TypeScript 类型声明，entry/exit 函数参数只能用 `f: any`。需在文件头添加 `/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */` 抑制由此产生的 ESLint 错误。`no-explicit-any` 在该项目中配置为 `warn` 级别，可接受。<!-- Agent A 2026-05-27 -->
 
 ### 7.10 守卫函数是纯 TypeScript 函数，不是 node graph entry point
-守卫函数（`canExitLock`、`canEnterLock` 等）和 `nextState`、`dispatchGroundState` 是纯 TypeScript 函数，仅供 `main.ts` 在 tick 事件处理器中调用。它们不直接调用 `f` API，而是通过参数 `ctx: BallContext` 接收所有需要的数据。编译时 genshin-ts 会将它们展开为节点图调用。<!-- Agent A 2026-05-27 -->
+守卫函数（`canExitLock`、`canEnterLock` 等）和 `nextState`、`dispatchGroundState` 是纯 TypeScript 函数，仅供 `main.ts` 在 tick 事件处理器中调用。它们不直接调用 `f` API，而是通过参数 `ctx: BallContext` 接收所有需要的数据。
+
+⚠️ **纯函数中的运算限制**：纯 TS 函数中的运算符不会生成 GIA 节点。handler 内的 `a < b` 编译为 `gsts.f.lessThan(a.value, b)`（生成 GIA `less_than` 节点），但纯函数内的 `===` 编译为 JS 引用比较。具体表现：
+- `number < number`（如 `xzSpeed < 2.0`）— ✅ 通过 `valueOf()` 取值比较，结果正确
+- `bigint === bigint`（如 `state === S_LOCK`）— ✅ bigint 按值比较
+- `entity === entity`（如 `lockedBy === ballSelf`）— **❌ 引用比较，永远 false**
+
+**原则**：`entity` 类型的相等判断必须在 handler 中用 `f.是否相等(entityA, entityB)` 进行，不能在纯函数中做。<!-- Agent A 2026-05-27，补充于 2026-05-27 -->
 
 ### 7.11 player_fsm 和 player_modifier 的骨架模式
 球员状态机（player_fsm.ts）目前只需要纯 TypeScript 骨架，不需要 `f` 参数。转移逻辑 `playerNextState` 暂时返回 `ctx.state` 保持状态不变，后续填充转移表时模式与 `stateMachine.ts` 的 `nextState` 一致：按优先级依次检查守卫条件，返回第一个命中的目标状态。<!-- Agent D 2026-05-27 -->

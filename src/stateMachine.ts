@@ -47,10 +47,8 @@ export interface BallContext {
   angularVz: number
   /** 球半径（0.45m） */
   ballRadius: number
-  /** 锁定此球的球员实体 ID，等于 ballSelf 表示自由（未被锁定） */
+  /** 锁定此球的球员实体（仅在进入 LOCK 时内联写入自定义变量） */
   lockedBy: entity
-  /** 球自身实体引用（用于判断 lockedBy 是否等于 ballSelf = 自由） */
-  ballSelf: entity
   /** 最近球员的实体 ID */
   nearestPlayerId: bigint
   /** 最近球员距离（米） */
@@ -76,11 +74,17 @@ export function canExitLock(ctx: BallContext): boolean {
 
 /**
  * 优先级 2：进入锁定
- * 条件：球未被锁定 且 最近球员距离 < 0.5m 且 水平速率 < 2.0
+ * 条件：最近球员距离 < 0.5m 且 水平速率 < 2.0
  * 目标：S_LOCK
+ *
+ * 注意：不再检查 entity 比较（lockedBy == ballSelf）
+ *       — 状态机优先级已确保不会从 S_LOCK 重复进入：
+ *         S_LOCK 时先检查 canExitLock（优先级 1），不满足才轮到此守卫
+ *         即使返回 S_LOCK，newState == currentState，exit/enter 不执行
+ *       — entity === 在纯 TS 函数中编译为 JS 引用比较，不生成 GIA equal 节点
  */
 export function canEnterLock(ctx: BallContext): boolean {
-  return bool(ctx.lockedBy == ctx.ballSelf && ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
+  return bool(ctx.nearestPlayerDist < 0.5 && ctx.xzSpeed < 2.0)
 }
 
 /**
