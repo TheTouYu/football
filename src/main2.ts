@@ -135,7 +135,6 @@ g.server({
       f.设置自定义变量(self, 'ballVy', bouncedVy)
       f.设置自定义变量(self, 'ballY', 0.451) // ballRadius(0.45) + ε(0.001)
 
-      // 日志：地面碰撞
       f.发送信号('日志操作', '物理' as any, f.拼装列表(['地面碰撞 Vy=', str(ballVy), '→', str(bouncedVy)]) as any)
     }
 
@@ -154,7 +153,6 @@ g.server({
     //    enter 函数内部写「状态」自定义变量
     // ============================================================
     if (bool(newState != currentState)) {
-      // 日志：状态变化
       f.发送信号('日志操作', '状态机' as any, f.拼装列表(['状态 ', str(currentState), '→', str(newState)]) as any)
 
       // exit 旧状态
@@ -169,8 +167,7 @@ g.server({
       } else if (bool(currentState == S_LOCK)) {
         // 内联 exitLock：用 self（球自身）= 自由
         f.设置自定义变量(self, 'lockedBy', self, true)
-        // 日志：退出锁定
-        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['退出锁定 距锁定者=', str(nearestPlayerDist)]) as any)
+        f.发送信号('日志操作', '锁定' as any, f.拼装列表(['退出锁定 距锁定者=', str(distFromLockerVal)]) as any)
       }
 
       // enter 新状态
@@ -183,7 +180,6 @@ g.server({
       } else if (bool(newState == S_AIR)) {
         enterAir(f)
       } else if (bool(newState == S_LOCK)) {
-        // 日志：进入锁定
         f.发送信号('日志操作', '锁定' as any, f.拼装列表(['进入锁定 距离=', str(nearestPlayerDist)]) as any)
         // 内联 enterLock：内联读取 nearestPlayerId 避免 setLocalVariable 类型解析失败
         f.设置自定义变量(

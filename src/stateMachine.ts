@@ -304,15 +304,9 @@ export function exitAir(f: any): void {
   f.停止并删除基础运动器(self, 'ballRotate', true)
 }
 
-// --- LOCK（锁定）---
-
 /**
- * 进入锁定：
- * - 记录锁定者为最近球员
- * - 写状态为 LOCK
- * - lockedBy 写入后 ball_physics.ts 的 do() 会施加初始水平速度（>= 7.0）
- * @param f  节点图 API
- * @param ctx 球上下文（用于获取 nearestPlayerId）
+ * 进入锁定（已废弃，改用内联模式）
+ * @deprecated 跨函数传递 entity 引用会导致 GIA 类型解析失败，已在 main2.ts/main3.ts 中内联
  */
 export function enterLock(f: any, ctx: BallContext): void {
   f.设置自定义变量(self, 'lockedBy', ctx.nearestPlayerId, true)
@@ -320,8 +314,8 @@ export function enterLock(f: any, ctx: BallContext): void {
 }
 
 /**
- * 退出锁定：
- * - 清除锁定者（设为 0n 表示自由）
+ * 退出锁定（已废弃，改用内联模式）
+ * @deprecated 同上
  */
 export function exitLock(f: any): void {
   f.设置自定义变量(self, 'lockedBy', 0n, true)

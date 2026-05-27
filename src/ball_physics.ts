@@ -285,7 +285,6 @@ export function doLock(f: any, lockerEntity: any): void {
     f.设置自定义变量(self, 'ballVx', kickVx, true)
     f.设置自定义变量(self, 'ballVz', kickVz, true)
 
-    // 日志：LOCK 初始踢球
     f.发送信号('日志操作', '锁定' as any, f.拼装列表(['LOCK初始踢球 V=7.5']) as any)
   } else {
     // 3. 球已在运动中：摩擦衰减 + 计算与锁定者的距离

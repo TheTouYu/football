@@ -121,7 +121,6 @@ export function checkPlayerCollision(f: any, playerEntity: any): boolean {
     f.设置自定义变量(ball, 'ballVy', velComps.yComponent)
     f.设置自定义变量(ball, 'ballVz', velComps.zComponent)
 
-    // 日志：球员碰撞
     f.发送信号('日志操作', '物理' as any, f.拼装列表(['球员碰撞 反射(Vx=', str(velComps.xComponent), ' Vy=', str(velComps.yComponent), ' Vz=', str(velComps.zComponent), ')']) as any)
 
     return true
