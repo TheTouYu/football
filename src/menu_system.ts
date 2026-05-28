@@ -128,12 +128,17 @@ g.server({
     f.设置自定义变量(self, '_menuSubRow1', 0n)
     f.设置自定义变量(self, '_menuSubRow2', 0n)
     f.设置自定义变量(self, '_menuSubRow3', 0n)
-    // 确认计数器
     f.设置自定义变量(self, '_menuConfirm', 0n)
+    f.设置自定义变量(self, '_menuFlash', 0n) // 确认闪烁标记（0=正常 1=显示圆点）
 
     f.启动定时器(self, 'menuInitDelay', false, [0.5])
   })
   .on('定时器触发时', (evt, f) => {
+    // 确认闪烁重置
+    if (bool(evt.timerName == 'menuFlashReset')) {
+      f.设置自定义变量(self, '_menuFlash', 0n)
+      return
+    }
     if (bool(evt.timerName != 'menuInitDelay')) return
 
     f.设置自定义变量(stage, '_menu_fld1', list('str', ['*', ' ', ' ', ' ', ' ']))
@@ -148,6 +153,7 @@ g.server({
     const col = f.获取自定义变量(self, '_menuCol').asType('int')
     const mainIdx = f.获取自定义变量(self, '_menuMainIdx').asType('int')
     const confirm = f.获取自定义变量(self, '_menuConfirm').asType('int')
+    const flash = f.获取自定义变量(self, '_menuFlash').asType('int')
     const sub0 = f.获取自定义变量(self, '_menuSubRow0').asType('int')
     const sub1 = f.获取自定义变量(self, '_menuSubRow1').asType('int')
     const sub2 = f.获取自定义变量(self, '_menuSubRow2').asType('int')
@@ -201,6 +207,9 @@ g.server({
           f.设置自定义变量(self, '_menuResult', mainIdx * 10n + row, true)
           f.设置自定义变量(self, '_menuResultMain', gstsServerCol1Text(mainIdx), true)
           f.设置自定义变量(self, '_menuResultSub', gstsServerSubText(mainIdx, row), true)
+          // 闪烁标记：选中的 * 短暂变为 •
+          f.设置自定义变量(self, '_menuFlash', 1n)
+          f.启动定时器(self, 'menuFlashReset', false, [0.2])
         }
         break
     }
@@ -216,22 +225,23 @@ g.server({
     f.设置自定义变量(self, '_menuSubRow3', newSub3)
 
     // ===== 渲染 =====
+    // 选中标记：正常=*，按空格后短暂显示•（200ms 后 _menuFlash 复位）
+    const marker = bool(flash > 0n) ? '•' : '*'
 
-    f.设置自定义变量(stage, '_menu_fld1', list('str', [
-      bool(bool(newRow === 0n) && bool(newCol === 0n)) ? '*' : ' ',
-      bool(bool(newRow === 1n) && bool(newCol === 0n)) ? '*' : ' ',
-      bool(bool(newRow === 2n) && bool(newCol === 0n)) ? '*' : ' ',
-      bool(bool(newRow === 3n) && bool(newCol === 0n)) ? '*' : ' ',
-      bool(bool(newRow === 4n) && bool(newCol === 0n)) ? '*' : ' ',
-    ]))
+    const c1r0 = bool(bool(newRow === 0n) && bool(newCol === 0n)) ? marker : ' '
+    const c1r1 = bool(bool(newRow === 1n) && bool(newCol === 0n)) ? marker : ' '
+    const c1r2 = bool(bool(newRow === 2n) && bool(newCol === 0n)) ? marker : ' '
+    const c1r3 = bool(bool(newRow === 3n) && bool(newCol === 0n)) ? marker : ' '
+    const c1r4 = bool(bool(newRow === 4n) && bool(newCol === 0n)) ? marker : ' '
+    f.设置自定义变量(stage, '_menu_fld1', list('str', [c1r0, c1r1, c1r2, c1r3, c1r4]))
     f.设置自定义变量(stage, '_menu_fld2', list('str', COL1))
-    f.设置自定义变量(stage, '_menu_fld3', list('str', [
-      bool(bool(newRow === 0n) && bool(newCol === 1n)) ? '*' : ' ',
-      bool(bool(newRow === 1n) && bool(newCol === 1n)) ? '*' : ' ',
-      bool(bool(newRow === 2n) && bool(newCol === 1n)) ? '*' : ' ',
-      bool(bool(newRow === 3n) && bool(newCol === 1n)) ? '*' : ' ',
-      bool(bool(newRow === 4n) && bool(newCol === 1n)) ? '*' : ' ',
-    ]))
+
+    const c2r0 = bool(bool(newRow === 0n) && bool(newCol === 1n)) ? marker : ' '
+    const c2r1 = bool(bool(newRow === 1n) && bool(newCol === 1n)) ? marker : ' '
+    const c2r2 = bool(bool(newRow === 2n) && bool(newCol === 1n)) ? marker : ' '
+    const c2r3 = bool(bool(newRow === 3n) && bool(newCol === 1n)) ? marker : ' '
+    const c2r4 = bool(bool(newRow === 4n) && bool(newCol === 1n)) ? marker : ' '
+    f.设置自定义变量(stage, '_menu_fld3', list('str', [c2r0, c2r1, c2r2, c2r3, c2r4]))
     // 字段4：第二列内容（内联 submenuContent — gstsServer 返回 str_list 不支持）
     let f4r0 = ''; let f4r1 = ''; let f4r2 = ''; let f4r3 = ''; let f4r4 = ''
     switch (newMainIdx) {
