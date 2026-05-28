@@ -7,8 +7,8 @@
 
 import { g } from 'genshin-ts-touyu/runtime/core'
 
-import { log } from './logger'
 import { doAir, doLock, doRoll, doSlide, doStill } from './ball_physics'
+import { log } from './logger'
 import { P_IDLE, playerNextState } from './player_fsm'
 import { allowModifier, applyModifier, MOD_NONE } from './player_modifier'
 import {
@@ -69,16 +69,36 @@ g.server({
     f.设置自定义变量(self, 'nearestPlayerDist', 999.0)
     f.设置自定义变量(self, '状态', S_STILL)
 
-    // Debug 视觉反馈变量（初始化 0.0，用户设为非零值触发闪烁）
-    f.设置自定义变量(self, '_debugFlash0', 0.0)
-    f.设置自定义变量(self, '_debugFlash1', 0.0)
+    // Debug 调试变量（初始化 0.0，用户设为非零值触发对应命令）
+    f.设置自定义变量(self, '_debugFlash0', 0.0) // 单步完整 tick
+    f.设置自定义变量(self, '_debugFlash1', 0.0) // 恢复运行
+    f.设置自定义变量(self, '_debugFlash2', 0.0) // 重置足球
+    f.设置自定义变量(self, '_debugFlash3', 0.0) // 打印诊断
+    f.设置自定义变量(self, '_debugFlash4', 0.0) // 慢速切换
+    f.设置自定义变量(self, '_debugFlash5', 0.0) // 单步转移
+    f.设置自定义变量(self, '_debugFlash6', 0.0) // 单步物理
+    f.设置自定义变量(self, '_debugFlash7', 0.0) // 守卫评估
+    f.设置自定义变量(self, '_debugForceDiag', 0.0) // 强制诊断标记
+    f.设置自定义变量(self, '_debugGuardEval', 0.0) // 守卫评估标记
+    f.设置自定义变量(self, '_debugSlowMode', 0.0) // 慢速模式状态 (0=正常 1=慢速)
+    f.设置自定义变量(self, '_debugFlash8', 0.0) // 强制静止
+    f.设置自定义变量(self, '_debugFlash9', 0.0) // 强制滚动
+    f.设置自定义变量(self, '_debugFlash10', 0.0) // 强制滑动
+    f.设置自定义变量(self, '_debugFlash11', 0.0) // 强制空中
+    f.设置自定义变量(self, '_debugFlash12', 0.0) // 强制锁定
 
     // 启动 motionTick 循环定时器（120ms 间隔）
     f.启动定时器(self, 'motionTick', true, [0.12])
   })
   .on('定时器触发时', (evt, f) => {
-    // 只处理 motionTick（正常循环）和 debugStepTick（调试单步）事件
-    if (bool(evt.timerName != 'motionTick' && evt.timerName != 'debugStepTick')) {
+    // 处理 motionTick（正常循环）、debugStepTick（单步完整）、debugStateTick（单步转移）
+    if (
+      bool(
+        evt.timerName != 'motionTick' &&
+        evt.timerName != 'debugStepTick' &&
+        evt.timerName != 'debugStateTick'
+      )
+    ) {
       return
     }
 
@@ -149,14 +169,85 @@ g.server({
     // ============================================================
 
     // ============================================================
-    // 3.5 调试日志：球员在 5m 内时打印诊断信息（节流 ~1.2s/次）
+    // 3.5 调试日志：球员在 5m 内时打印诊断信息（节流 ~2.4s/次）
     //     帮助定位「球不动」原因：确认状态、速度、距离等关键值
+    //     设置 _debugForceDiag=1 可强制立即打印一次（无视节流）
+    //     设置 _debugGuardEval=1 可打印所有守卫条件评估
     // ============================================================
     const diagTick = f.获取节点图变量自动类型推断('_diagTick')
     const nextTick = diagTick + 1n
-    f.设置节点图变量自动类型推断('_diagTick', bool(nextTick >= 20n) ? 0n : nextTick)
-    if (bool(bool(nearestPlayerDist < 5.0) && bool(diagTick >= 19n))) {
-      log(f, '诊断', ['诊断 状态=', str(currentState), ' xz=', str(xzSpeed), ' 最近=', str(nearestPlayerDist), ' 距锁=', str(distFromLockerVal)])
+    f.设置节点图变量自动类型推断('_diagTick', bool(nextTick >= 100n) ? 0n : nextTick)
+
+    // 检查强制诊断标记
+    const forceDiag = f.获取自定义变量(self, '_debugForceDiag').asType('float')
+    const forcePrint = bool(bool(nearestPlayerDist < 5.0) && bool(diagTick >= 19n))
+    if (bool(bool(forceDiag > 0.0) || forcePrint)) {
+      log(f, '诊断', [
+        '诊断 状态=',
+        str(currentState),
+        ' xz=',
+        str(xzSpeed),
+        ' 最近=',
+        str(nearestPlayerDist),
+        ' 距锁=',
+        str(distFromLockerVal)
+      ])
+      if (bool(forceDiag > 0.0)) {
+        f.设置自定义变量(self, '_debugForceDiag', 0.0, true)
+      }
+    }
+
+    // 检查守卫评估标记
+    const guardEval = f.获取自定义变量(self, '_debugGuardEval').asType('float')
+    if (bool(guardEval > 0.0)) {
+      // 评估每个守卫条件并打印
+      const gExit = bool(bool(distFromLockerVal > 2.0) && bool(currentState == S_LOCK))
+      const gEnter = bool(bool(nearestPlayerDist < 0.5) && bool(xzSpeed < 2.0))
+      const gAir = bool(
+        bool(
+          bool(currentState == S_STILL) ||
+          bool(currentState == S_ROLL) ||
+          bool(currentState == S_SLIDE)
+        ) && bool(ballVy > 0.0)
+      )
+      const gLand = bool(
+        bool(currentState == S_AIR) && bool(ballY <= ballRadius) && bool(ballVy <= 0.0)
+      )
+      const gStill = bool(
+        bool(bool(currentState == S_ROLL) || bool(currentState == S_SLIDE)) && bool(xzSpeed < 0.1)
+      )
+      const gRoll = bool(
+        bool(bool(currentState == S_SLIDE) || bool(currentState == S_AIR)) &&
+        bool(xzSpeed >= 0.1) &&
+        bool(xzSpeed < 4.0) &&
+        bool(ballY <= ballRadius)
+      )
+      const gSlide = bool(
+        bool(
+          bool(currentState == S_ROLL) ||
+          bool(currentState == S_STILL) ||
+          bool(currentState == S_AIR)
+        ) &&
+        bool(xzSpeed >= 7.0) &&
+        bool(ballY <= ballRadius)
+      )
+      log(f, '守卫', [
+        '守卫 退出=',
+        str(int(gExit)),
+        ' 进入锁=',
+        str(int(gEnter)),
+        ' 起飞=',
+        str(int(gAir)),
+        ' 落地=',
+        str(int(gLand)),
+        ' 静止=',
+        str(int(gStill)),
+        ' 滚动=',
+        str(int(gRoll)),
+        ' 滑动=',
+        str(int(gSlide))
+      ])
+      f.设置自定义变量(self, '_debugGuardEval', 0.0, true)
     }
 
     // ============================================================
@@ -164,8 +255,13 @@ g.server({
     //    使用 gstsServer 标记的跨文件调用，独立原始参数
     // ============================================================
     const newState = gstsServerNextState(
-      currentState, xzSpeed, ballVy, ballY, ballRadius,
-      nearestPlayerDist, distFromLockerVal
+      currentState,
+      xzSpeed,
+      ballVy,
+      ballY,
+      ballRadius,
+      nearestPlayerDist,
+      distFromLockerVal
     )
 
     // ============================================================
@@ -213,6 +309,17 @@ g.server({
     }
 
     // 注意：不在此处调用 doXxx() — 物理执行由 Graph 2 负责
+
+    // ============================================================
+    // 6. tick 末尾：如果是单步 tick（debugStepTick/debugStateTick），不重启循环
+    //    如果是正常 motionTick，按当前慢速模式间隔重启
+    // ============================================================
+    if (bool(evt.timerName == 'motionTick')) {
+      const slowMode = f.获取自定义变量(self, '_debugSlowMode').asType('float')
+      const interval = bool(slowMode > 0.0) ? 0.5 : 0.12
+      f.暂停定时器(self, 'motionTick')
+      f.启动定时器(self, 'motionTick', true, [interval])
+    }
   })
 
 // ============================================================
@@ -231,8 +338,8 @@ g.server({
     f.启动定时器(self, 'physicsTick', true, [0.12])
   })
   .on('定时器触发时', (evt, f) => {
-    // 只处理 physicsTick 事件
-    if (bool(evt.timerName != 'physicsTick')) {
+    // 处理 physicsTick（正常循环）和 debugPhysicsTick（调试单步物理）
+    if (bool(evt.timerName != 'physicsTick' && evt.timerName != 'debugPhysicsTick')) {
       return
     }
 
@@ -317,8 +424,9 @@ g.server({
     f.列表迭代循环(players, 扫描球员回调)
 
     // 日志：扫描结果 — 确认扫描器是否找到球员以及距离
-    const scanDist = f.获取自定义变量(self, 'nearestPlayerDist').asType('float')
-    log(f, '扫描', ['扫描 最近球员 距离=', str(scanDist)])
+    // const scanDist = f.获取自定义变量(self, 'nearestPlayerDist').asType('float')
+    // log(f, '扫描', ['扫描 最近球员 距离=', str(scanDist)])
+
   })
 
 // ============================================================
@@ -418,40 +526,147 @@ g.server({
 
 // ============================================================
 // Graph 5: Ball_Debug视觉 (ID 1073742444, 挂载足球实体)
-// 职责：调试单步执行 — 暂停/恢复定时器 + 逐帧步进
+// 职责：调试命令中枢 — 响应 8 个 _debugFlash 变量变化
 //
-//  _debugFlash0 变化 → 暂停循环 → 触发一步（走一轮状态机）
-//  _debugFlash1 变化 → 恢复循环定时器（回到正常 120ms 运行）
-//
-// 用户用法：
-//   f.设置自定义变量(self, '_debugFlash0', 1.0, true)  // 步进一次
-//   f.设置自定义变量(self, '_debugFlash1', 1.0, true)  // 恢复运行
+//  _debugFlash0 → 单步完整 tick（暂停 + debugStepTick 一次性）
+//  _debugFlash1 → 恢复运行（恢复 motionTick 循环）
+//  _debugFlash2 → 重置足球（速度归零 + 状态静止 + 清运动器）
+//  _debugFlash3 → 强制诊断（置 _debugForceDiag=1，下一 tick 打印）
+//  _debugFlash4 → 慢速切换（120ms ↔ 500ms）
+//  _debugFlash5 → 单步转移（不跑物理，只跑状态机一轮）
+//  _debugFlash6 → 单步物理（不跑转移，只跑物理计算一轮）
+//  _debugFlash7 → 守卫评估（置 _debugGuardEval=1，下一 tick 打印）
 // ============================================================
 
 g.server({
   id: 1073742444,
   name: 'Ball_Debug视觉',
   lang: 'zh'
-})
-  .on('自定义变量变化时', (evt, f) => {
-    // 快速过滤：只处理 _debugFlash0 / _debugFlash1，其余立即返回
-    const notFlash0 = bool(evt.variableName != '_debugFlash0')
-    const notFlash1 = bool(evt.variableName != '_debugFlash1')
-    if (bool(notFlash0 && notFlash1)) {
-      return
-    }
+}).on('自定义变量变化时', (evt, f) => {
+  const name = evt.variableName
 
-    if (bool(evt.variableName == '_debugFlash0')) {
-      // == 步进模式 ==
-      // 1. 暂停循环定时器（停止自动运行）
-      f.暂停定时器(self, 'motionTick')
-      // 2. 启动一次性 debugStepTick（0.01s 后触发）
-      //    Ball_主控的定时器 handler 同时响应 motionTick 和 debugStepTick
-      //    debugStepTick 触发一轮状态机后自动结束，不会重启
-      f.启动定时器(self, 'debugStepTick', false, [0.01])
+  // == 快速过滤：只处理 _debugFlash，其余返回 ==
+  const isFlash0 = bool(name == '_debugFlash0')
+  const isFlash1 = bool(name == '_debugFlash1')
+  const isFlash2 = bool(name == '_debugFlash2')
+  const isFlash3 = bool(name == '_debugFlash3')
+  const isFlash4 = bool(name == '_debugFlash4')
+  const isFlash5 = bool(name == '_debugFlash5')
+  const isFlash6 = bool(name == '_debugFlash6')
+  const isFlash7 = bool(name == '_debugFlash7')
+  const isFlash8 = bool(name == '_debugFlash8')
+  const isFlash9 = bool(name == '_debugFlash9')
+  const isFlash10 = bool(name == '_debugFlash10')
+  const isFlash11 = bool(name == '_debugFlash11')
+  const isFlash12 = bool(name == '_debugFlash12')
+  if (
+    bool(
+      !bool(
+        isFlash0 ||
+        bool(
+          isFlash1 ||
+          bool(
+            isFlash2 ||
+            bool(isFlash3 || bool(isFlash4 || bool(isFlash5 || bool(isFlash6 || bool(isFlash7 || bool(isFlash8 || bool(isFlash9 || bool(isFlash10 || bool(isFlash11 || isFlash12)))))))))
+          )
+        )
+      )
+    )
+  ) {
+    return
+  }
+
+  if (isFlash0) {
+    // == 单步完整 tick ==
+    f.暂停定时器(self, 'motionTick')
+    f.启动定时器(self, 'debugStepTick', false, [0.01])
+  } else if (isFlash1) {
+    // == 恢复运行 ==
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash2) {
+    // == 重置足球 ==
+    f.设置自定义变量(self, 'ballVx', 0.0, true)
+    f.设置自定义变量(self, 'ballVy', 0.0, true)
+    f.设置自定义变量(self, 'ballVz', 0.0, true)
+    f.设置自定义变量(self, 'ballY', 0.45, true)
+    f.设置自定义变量(self, 'angularVx', 0.0, true)
+    f.设置自定义变量(self, 'angularVy', 0.0, true)
+    f.设置自定义变量(self, 'angularVz', 0.0, true)
+    f.设置自定义变量(self, '状态', S_STILL, true)
+    f.设置自定义变量(self, 'lockedBy', self, true)
+    f.设置自定义变量(self, 'distFromLocker', 0.0, true)
+    f.停止并删除基础运动器(self, 'ballLinear', true)
+    f.停止并删除基础运动器(self, 'ballRotate', true)
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash3) {
+    // == 强制诊断 ==
+    f.设置自定义变量(self, '_debugForceDiag', 1.0, true)
+  } else if (isFlash4) {
+    // == 慢速切换 ==
+    const slowMode = f.获取自定义变量(self, '_debugSlowMode').asType('float')
+    if (bool(slowMode > 0.0)) {
+      f.设置自定义变量(self, '_debugSlowMode', 0.0, true)
     } else {
-      // == 恢复模式 ==
-      // 恢复被暂停的循环定时器
-      f.恢复定时器(self, 'motionTick')
+      f.设置自定义变量(self, '_debugSlowMode', 1.0, true)
     }
-  })
+  } else if (isFlash5) {
+    // == 单步转移（只跑状态机，不跑物理）==
+    f.暂停定时器(self, 'motionTick')
+    f.启动定时器(self, 'debugStateTick', false, [0.01])
+  } else if (isFlash6) {
+    // == 单步物理（只跑物理，不跑状态机）==
+    f.启动定时器(self, 'debugPhysicsTick', false, [0.01])
+  } else if (isFlash7) {
+    // == 守卫评估 ==
+    f.设置自定义变量(self, '_debugGuardEval', 1.0, true)
+  } else if (isFlash8) {
+    // == 强制静止 ==
+    f.设置自定义变量(self, 'ballVx', 0.0, true)
+    f.设置自定义变量(self, 'ballVy', 0.0, true)
+    f.设置自定义变量(self, 'ballVz', 0.0, true)
+    f.设置自定义变量(self, 'ballY', 0.45, true)
+    f.设置自定义变量(self, 'angularVx', 0.0, true)
+    f.设置自定义变量(self, 'angularVy', 0.0, true)
+    f.设置自定义变量(self, 'angularVz', 0.0, true)
+    f.设置自定义变量(self, '状态', S_STILL, true)
+    f.设置自定义变量(self, 'lockedBy', self, true)
+    f.设置自定义变量(self, 'distFromLocker', 0.0, true)
+    f.停止并删除基础运动器(self, 'ballLinear', true)
+    f.停止并删除基础运动器(self, 'ballRotate', true)
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash9) {
+    // == 强制滚动 ==
+    f.设置自定义变量(self, 'ballVx', 3.0, true)
+    f.设置自定义变量(self, 'ballVy', 0.0, true)
+    f.设置自定义变量(self, 'ballVz', 0.0, true)
+    f.设置自定义变量(self, 'ballY', 0.45, true)
+    f.设置自定义变量(self, 'frictionDecay', 0.95, true)
+    f.设置自定义变量(self, '状态', S_ROLL, true)
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash10) {
+    // == 强制滑动 ==
+    f.设置自定义变量(self, 'ballVx', 8.0, true)
+    f.设置自定义变量(self, 'ballVy', 0.0, true)
+    f.设置自定义变量(self, 'ballVz', 0.0, true)
+    f.设置自定义变量(self, 'ballY', 0.45, true)
+    f.设置自定义变量(self, 'frictionDecay', 0.95, true)
+    f.设置自定义变量(self, 'angularDecay', 0.9, true)
+    f.设置自定义变量(self, '状态', S_SLIDE, true)
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash11) {
+    // == 强制空中 ==
+    f.设置自定义变量(self, 'ballVy', 5.0, true)
+    f.设置自定义变量(self, 'ballY', 2.0, true)
+    f.设置自定义变量(self, 'airResistance', 0.995, true)
+    f.设置自定义变量(self, 'gravity', 9.8, true)
+    f.设置自定义变量(self, '状态', S_AIR, true)
+    f.恢复定时器(self, 'motionTick')
+  } else if (isFlash12) {
+    // == 强制锁定 ==
+    const lockerEntity = f.获取自定义变量(self, 'nearestPlayerId').asType('entity')
+    f.设置自定义变量(self, 'lockedBy', lockerEntity, true)
+    f.设置自定义变量(self, 'distFromLocker', 0.0, true)
+    f.设置自定义变量(self, '状态', S_LOCK, true)
+    f.恢复定时器(self, 'motionTick')
+  }
+})

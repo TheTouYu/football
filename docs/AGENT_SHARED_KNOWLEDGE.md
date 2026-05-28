@@ -116,8 +116,9 @@
 | `1073742443` | **节点图 ID** | main3.ts Player FSM — 球员基础状态机 |
 | `1073742444` | **节点图 ID** | main2.ts Ball_Debug视觉 — 调试单步执行（暂停/恢复定时器） |
 | `1073742445` | **节点图 ID** | debug_controller.ts Debug_创建控制台 — 游戏开始时创建元件7 |
-| `1073742446` | **节点图 ID** | debug_controller.ts Debug_选项卡控制 — 选项卡触发单步/恢复 |
-| `1073742447+` | **节点图 ID** (新) | 后续新增从 1073742447 开始递增分配 |
+| `1073742446` | **节点图 ID** | debug_controller.ts Debug_菜单入口提示 — 已废弃，迁移至 menu_system.ts |
+| `1073742447` | **节点图 ID** | menu_system.ts Menu_交互菜单 — 二级菜单系统（上下左右空格导航） |
+| `1073742448+` | **节点图 ID** (新) | 后续新增从 1073742448 开始递增分配 |
 
 > **关键区别**：`prefabId` ≠ 节点图 ID。prefabId 是编辑器中元件的标识，节点图 ID 是代码逻辑挂载的标识。用 `prefabId()` 查找实体时用元件 ID，用 `g.server({ id: ... })` 配置时用节点图 ID。
 
@@ -498,22 +499,44 @@ const lockedByEntity = f.获取自定义变量(self, 'lockedBy').asType("entity"
 ### 7.25 gstsServer 回调函数内用 gsts.f 英文 API
 作为 `列表迭代循环` 回调的 `gstsServer` 函数内，必须使用 `gsts.f` + 英文 API 名（如 `gsts.f.getAllCharacterEntitiesOfSpecifiedPlayer`、`gsts.f.getCorrespondingValueFromList`、`gsts.f._3dVectorSubtraction` 等），因为 `gsts.f` 的 TypeScript 类型定义不含中文别名。中文 API 名只能在 `f`（`any` 类型）上使用。<!-- Agent Touyu 2026-05-27 -->
 
-### 7.26 Debug 调试变量触发即时 tick
-在足球实体上新增了节点图 `Ball_Debug视觉`（ID 1073742444），用于调试。原理：
-- 2 个 float 调试变量 `_debugFlash0` / `_debugFlash1`（初始化 0.0）
-- 监听 `自定义变量变化时` 事件，非 debug 变量快速过滤返回
-- 匹配时：将 `motionTick` 定时器替换为 0.01s 一次性定时器（同名覆盖）
-  → 0.01s 后 Ball_主控的 tick handler 运行一轮状态机
-  → tick handler 末尾重新拉起 0.12s 循环定时器
+### 7.26 Debug 调试系统（Ball_Debug视觉 + 选项卡控制台）
 
-用户使用方法：
-```typescript
-// 在任意有 f 和 ball 引用的位置触发一次即时 tick
-f.设置自定义变量(ball, '_debugFlash0', 1.0, true)  // 第三个参数 true 触发事件
-```
-关键：必须传 `triggerEvent=true` 参数，否则不触发 `自定义变量变化时` 事件。
+足球实体上挂载 `Ball_Debug视觉`（ID 1073742444），通过 `debug_controller.ts` 选项卡触发 13 个调试命令。
 
-注意：`motionTick` 循环定时器的重启移到了 tick handler 末尾（而非仅在 `实体创建时` 启动一次），这是为了 debug one-shot 触发后能恢复循环。正常运行时每 120ms 重启一次无副作用。<br/><!-- 2026-05-27 -->
+**架构**：
+- `debug_controller.ts` Graph 1（ID 1073742445）：足球实体创建时，用 `创建元件` 生成元件7（翻开的书籍）实例
+- `debug_controller.ts` Graph 2（ID 1073742446）：挂载元件7，13 个选项卡选中时向足球写入 `_debugFlash*` 变量
+- `main2.ts` Graph 5（ID 1073742444）：监听足球 `自定义变量变化时`，匹配 `_debugFlash` 前缀后执行对应命令
+
+**13 个调试命令**：
+
+| 选项卡 | 变量 | 功能 | 原理 |
+|--------|------|------|------|
+| 1 | `_debugFlash0` | 单步完整 tick | 暂停 motionTick + 0.01s debugStepTick 一次性 |
+| 2 | `_debugFlash1` | 恢复运行 | 恢复 motionTick 循环 |
+| 3 | `_debugFlash2` | 重置足球 | 速度归零 + S_STILL + 清运动器 |
+| 4 | `_debugFlash3` | 打印诊断 | 置 _debugForceDiag=1，下 tick 强制输出 |
+| 5 | `_debugFlash4` | 慢速切换 | 120ms ↔ 500ms（_debugSlowMode 标记） |
+| 6 | `_debugFlash5` | 单步转移 | 暂停 + debugStateTick（只跑状态机） |
+| 7 | `_debugFlash6` | 单步物理 | debugPhysicsTick 一次性（只跑物理） |
+| 8 | `_debugFlash7` | 守卫评估 | 置 _debugGuardEval=1，下 tick 打印 7 守卫 true/false |
+| 9 | `_debugFlash8` | 强制静止 | 清零所有速度 + S_STILL + 清运动器 |
+| 10 | `_debugFlash9` | 强制滚动 | Vx=3.0 + friction=0.95 + S_ROLL |
+| 11 | `_debugFlash10` | 强制滑动 | Vx=8.0 + friction=0.95 + angularDecay=0.9 + S_SLIDE |
+| 12 | `_debugFlash11` | 强制空中 | Vy=5.0 + Y=2.0 + airResistance=0.995 + S_AIR |
+| 13 | `_debugFlash12` | 强制锁定 | 读 nearestPlayerId → lockedBy + S_LOCK |
+
+**Graph 1 辅助变量**：
+- `_debugForceDiag`（float）：设为 1.0 → 下 tick 强制打印诊断（无视节流），打印后自动归零
+- `_debugGuardEval`（float）：设为 1.0 → 下 tick 评估并打印 7 个守卫条件，打印后自动归零
+- `_debugSlowMode`（float）：0=正常 120ms，1=慢速 500ms
+
+**Graph 2 辅助 tick**：
+- `debugPhysicsTick`：Graph 2（Ball_物理）接受此一次性 tick，只跑物理 doXxx()
+- `debugStateTick`：Graph 1（Ball_主控）接受此一次性 tick，只跑状态转移
+- `debugStepTick`：Graph 1 接受此一次性 tick，跑完整 tick（状态转移 + exit/enter）
+
+**调试覆盖**：全部 5 个状态（STILL/ROLL/SLIDE/AIR/LOCK）均可通过选项卡强制进入，配合单步/慢速/守卫评估完整诊断状态机行为。<br/><!-- 2026-05-27，扩展于 2026-05-28 -->
 
 ### 7.27 读取自定义变量统一用 `.asType()` 代替 `f.数据类型转换`
 读取自定义变量时，统一使用 `.asType('float')` / `.asType('int')` 简写，替代 `f.数据类型转换(f.获取自定义变量(...), 'float')`：
@@ -603,6 +626,7 @@ const newState = gstsServerNextState(
 | `main.ts` | 旧架构 | — | src_old/main.ts，仅作参考 |
 | `main2.ts` | 已完成 | Agent Touyu | 4 Graph 架构：主控+物理+扫描+Player FSM，列表迭代循环扫描 |
 | `main3.ts` | 已完成 | Agent Touyu | 2 Graph 架构：Ball FSM（8索引扫描+内联碰撞）+ Player FSM |
+| `debug_controller.ts` | 已完成 | Agent Touyu | 调试控制台：创建元件7 + 13 选项卡触发调试命令 |
 
 ---
 
@@ -693,7 +717,8 @@ Error: Generic parameter not matched: str type × addition numeric overload
 | `'锁定'` | 进入 LOCK | main2.ts / main3.ts | 进入时 |
 | `'锁定'` | 退出 LOCK | main2.ts / main3.ts | 退出时 |
 | `'锁定'` | LOCK 初帧踢球 | ball_physics.ts | 踢球时 |
-| `'扫描'` | 扫描到最近球员 | main2.ts | 每次扫描（500ms） |
-| `'诊断'` | 球员在 5m 内时的关键值 | main2.ts | 条件满足时的每 tick |
+| `'扫描'` | 扫描到最近球员 | main2.ts | 每次扫描（1s） |
+| `'诊断'` | 球员在 5m 内时的关键值 | main2.ts | 条件满足时每 tick（节流 ~2.4s） |
+| `'守卫'` | 7 个守卫 true/false 评估 | main2.ts | _debugGuardEval 触发时 |
 
 状态编号映射：`0=静止` `1=滚动` `2=滑动` `3=空中` `4=锁定`
