@@ -1,61 +1,139 @@
 // menu_system.ts — 交互式二级菜单系统（可复用模块）
 // v1: 5行×2列 二级菜单，通过界面控件（上下左右空格）导航
 //
-// 挂载：角色实体（必须！界面控件组触发时 只有角色实体能收到）
-// 渲染目标：stage 上 4 个 str_list 变量（对应 struct 菜单 的字段 1/2/3/4）
-// 文本框模板：{1:lv.菜单.1.i}{1:lv.菜单.2.i} · {1:lv.菜单.3.i}{1:lv.菜单.4.i}
+// ===== 接入指南 =====
+// 1. 改底部「菜单内容定义」区的文字
+// 2. 改「渲染配置」区的目标实体和变量名前缀
+// 3. 改 col1Text()/subText() 的文字映射
+// 4. 消费者监听 ball._menuConfirm 变化 → 读 _menuResult* 数据 → 分派
+// 5. 分配新节点图 ID
+//
+// ===== 输出变量（写在 _RESULT_TARGET 实体上）=====
+// _menuConfirm (int) — 每次确认递增，消费者监听此变量变化事件
+// _menuResult  (int) — 编码位置 = mainIdx*10 + row
+// _menuResultMain (str) — 主菜单文字
+// _menuResultSub  (str) — 子菜单文字
+//
+// ===== 渲染输出（写在 _RENDER_TARGET 实体的 _RENDER_PREFIX{1,2,3,4} 变量上）=====
+// 文本框模板：
+//   {1:lv._RENDER_PREFIX1.i}{1:lv._RENDER_PREFIX2.i} · {1:lv._RENDER_PREFIX3.i}{1:lv._RENDER_PREFIX4.i}
 //
 // v2 扩展点：
 //   - VISIBLE_ROWS 改为动态变量支持滚动视口
 //   - _menuCol 改为 _menuPath[] 栈支持多级（MENU_MAX_DEPTH）
 //   - _menuScrollOffset 支持数据项 > 可见行时的轮询
-//   - 命令表改为可注册的回调模式
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
 import { g } from 'genshin-ts-touyu/runtime/core'
 
 // ============================================================
-// 可配置常量（换系统时改这里）
+// 渲染配置（换系统时改下面的 stage 为目标实体）
+// ============================================================
+
+/** 渲染变量名前缀（不需要改） */
+
+// 足球元件 ID
+const _BALL_PREFAB = 1077936262
+
+// ============================================================
+// 可配置常量
 // ============================================================
 
 /** 可见行数（v2：改为动态变量支持滚动） */
 const VISIBLE_ROWS = 5
 /** 菜单最大深度（v2：>2 时启用路径栈） */
 const MENU_MAX_DEPTH = 2
-/** 主菜单项数 */
-const MAIN_ITEM_COUNT = 4
 
-// 按钮 ID
-const BTN_UP = 1073742328n
-const BTN_DOWN = 1073742329n
-const BTN_LEFT = 1073742330n
-const BTN_RIGHT = 1073742331n
-const BTN_SPACE = 1073742335n
-
-// 足球元件 ID
-const BALL_PREFAB = 1077936262
+// 主菜单最大行索引（4 项，索引 0~3）
+const MAIN_MAX_ROW = 3n
+// 子菜单最大行索引
+const SUB0_MAX_ROW = 2n
+const SUB1_MAX_ROW = 4n
+const SUB2_MAX_ROW = 1n
+const SUB3_MAX_ROW = 2n
 
 // ============================================================
-// 菜单内容定义（换系统时只需改下面的数组）
+// 菜单内容定义（换系统时只需改下面的数组 + col1Text/subText 函数）
 // ============================================================
 
-/** 第一列内容（主菜单），长度 VISIBLE_ROWS，不足补空串 */
+/** 第一列内容（主菜单），长度 VISIBLE_ROWS */
 const COL1: string[] = ['运行控制', '状态跳转', '信息诊断', '其他操作', '']
 
-/** 子菜单内容（每个主菜单对应一个长度 VISIBLE_ROWS 的数组） */
-const SUB_0: string[] = ['单步完整', '恢复运行', '慢速切换', '', '']
-const SUB_1: string[] = ['强制静止', '强制滚动', '强制滑动', '强制空中', '强制锁定']
-const SUB_2: string[] = ['打印诊断', '守卫评估', '', '', '']
-const SUB_3: string[] = ['重置足球', '单步转移', '单步物理', '', '']
+/** 子菜单内容表 */
+const SUB_0: string[] = ['单步完整',    '恢复运行', '慢速切换', '', '']
+const SUB_1: string[] = ['强制静止',    '强制滚动', '强制滑动', '强制空中', '强制锁定']
+const SUB_2: string[] = ['打印诊断',    '守卫评估', '',         '',      '']
+const SUB_3: string[] = ['重置足球',    '单步转移', '单步物理', '',      '']
 
-/** 每个子菜单项数（用于下边界钳位） */
-const SUB_0_COUNT = 3
-const SUB_1_COUNT = 5
-const SUB_2_COUNT = 2
-const SUB_3_COUNT = 3
+// ============================================================
+// 辅助函数
+// ============================================================
+function submenuContent(mainIdx: bigint): string[] {
+  switch (mainIdx) {
+    case 0n: return SUB_0
+    case 1n: return SUB_1
+    case 2n: return SUB_2
+    case 3n: return SUB_3
+    default:  return ['', '', '', '', '']
+  }
+}
+
+function submenuMaxRow(mainIdx: bigint): bigint {
+  switch (mainIdx) {
+    case 0n: return SUB0_MAX_ROW
+    case 1n: return SUB1_MAX_ROW
+    case 2n: return SUB2_MAX_ROW
+    case 3n: return SUB3_MAX_ROW
+    default:  return 0n
+  }
+}
+
+function col1Text(mainIdx: bigint): string {
+  switch (mainIdx) {
+    case 0n: return '运行控制'
+    case 1n: return '状态跳转'
+    case 2n: return '信息诊断'
+    case 3n: return '其他操作'
+    default:  return ''
+  }
+}
+
+function subText(mainIdx: bigint, row: bigint): string {
+  switch (mainIdx) {
+    case 0n:
+      switch (row) {
+        case 0n: return '单步完整'
+        case 1n: return '恢复运行'
+        case 2n: return '慢速切换'
+      }
+      break
+    case 1n:
+      switch (row) {
+        case 0n: return '强制静止'
+        case 1n: return '强制滚动'
+        case 2n: return '强制滑动'
+        case 3n: return '强制空中'
+        case 4n: return '强制锁定'
+      }
+      break
+    case 2n:
+      switch (row) {
+        case 0n: return '打印诊断'
+        case 1n: return '守卫评估'
+      }
+      break
+    case 3n:
+      switch (row) {
+        case 0n: return '重置足球'
+        case 1n: return '单步转移'
+        case 2n: return '单步物理'
+      }
+      break
+  }
+  return ''
+}
 
 // ============================================================
 // Menu_交互菜单 (ID 1073742447, 挂载角色实体)
-// 多人模式：evt.eventSourceEntity == self 守卫防重复触发
 // ============================================================
 
 g.server({
@@ -70,120 +148,119 @@ g.server({
     if (f.获取节点图变量自动类型推断('_init')) return
     f.设置节点图变量自动类型推断('_init', true)
 
-    // 状态变量（v2：_menuCol → _menuPath[] 栈）
-    f.设置自定义变量(self, '_menuRow', 0.0)
-    f.设置自定义变量(self, '_menuCol', 0.0)
-    f.设置自定义变量(self, '_menuMainIdx', 0.0)
+    f.设置自定义变量(self, '_menuRow', 0n)
+    f.设置自定义变量(self, '_menuCol', 0n)
+    f.设置自定义变量(self, '_menuMainIdx', 0n)
+    f.设置自定义变量(self, '_menuSubRow0', 0n)
+    f.设置自定义变量(self, '_menuSubRow1', 0n)
+    f.设置自定义变量(self, '_menuSubRow2', 0n)
+    f.设置自定义变量(self, '_menuSubRow3', 0n)
+    // 确认计数器
+    f.设置自定义变量(self, '_menuConfirm', 0n)
 
-    // stage 关卡实体初始化需要时间，延迟 500ms 后首次渲染
     f.启动定时器(self, 'menuInitDelay', false, [0.5])
   })
   .on('定时器触发时', (evt, f) => {
-    // 只处理 menuInitDelay 一次性定时器
     if (bool(evt.timerName != 'menuInitDelay')) return
 
-    // 初始渲染 (row=0, col=0, mainIdx=0)
     f.设置自定义变量(stage, '_menu_fld1', list('str', ['*', ' ', ' ', ' ', ' ']))
     f.设置自定义变量(stage, '_menu_fld2', list('str', COL1))
     f.设置自定义变量(stage, '_menu_fld3', list('str', [' ', ' ', ' ', ' ', ' ']))
     f.设置自定义变量(stage, '_menu_fld4', list('str', SUB_0))
   })
   .on('界面控件组触发时', (evt, f) => {
-    // 多人守卫：只处理属于本角色的交互事件
     if (!bool(f.equal(evt.eventSourceEntity, self))) return
 
     const btnId = evt.uiControlGroupIndex
-
-    // 读状态
-    const row = f.获取自定义变量(self, '_menuRow').asType('float')
-    const col = f.获取自定义变量(self, '_menuCol').asType('float')
-    const mainIdx = f.获取自定义变量(self, '_menuMainIdx').asType('float')
+    const row = f.获取自定义变量(self, '_menuRow').asType('int')
+    const col = f.获取自定义变量(self, '_menuCol').asType('int')
+    const mainIdx = f.获取自定义变量(self, '_menuMainIdx').asType('int')
+    const confirm = f.获取自定义变量(self, '_menuConfirm').asType('int')
+    const sub0 = f.获取自定义变量(self, '_menuSubRow0').asType('int')
+    const sub1 = f.获取自定义变量(self, '_menuSubRow1').asType('int')
+    const sub2 = f.获取自定义变量(self, '_menuSubRow2').asType('int')
+    const sub3 = f.获取自定义变量(self, '_menuSubRow3').asType('int')
 
     let newRow = row
     let newCol = col
     let newMainIdx = mainIdx
+    let newConfirm = confirm
+    let newSub0 = sub0
+    let newSub1 = sub1
+    let newSub2 = sub2
+    let newSub3 = sub3
 
-    // ===== 导航 =====
-    if (bool(btnId === BTN_UP)) {
-      newRow = bool(row - 1.0 < 0.0) ? 0.0 : (row - 1.0)
-    } else if (bool(btnId === BTN_DOWN)) {
-      let col1Max = 0.0
-      if (bool(mainIdx === 0.0)) col1Max = float(SUB_0_COUNT) - 1.0
-      else if (bool(mainIdx === 1.0)) col1Max = float(SUB_1_COUNT) - 1.0
-      else if (bool(mainIdx === 2.0)) col1Max = float(SUB_2_COUNT) - 1.0
-      else if (bool(mainIdx === 3.0)) col1Max = float(SUB_3_COUNT) - 1.0
+    const maxRow = bool(col === 0n) ? MAIN_MAX_ROW : submenuMaxRow(mainIdx)
 
-      const maxRow = bool(col === 0.0) ? (float(MAIN_ITEM_COUNT) - 1.0) : col1Max
-      const rowPlus = row + 1.0
-      newRow = bool(rowPlus > maxRow) ? maxRow : rowPlus
-    } else if (bool(btnId === BTN_LEFT)) {
-      newCol = 0.0
-    } else if (bool(btnId === BTN_RIGHT)) {
-      newCol = 1.0
-      newMainIdx = row
-    } else if (bool(btnId === BTN_SPACE)) {
-      // ===== 命令执行 =====
-      if (bool(col === 1.0)) {
-        const balls = f.获取场上指定元件ID的实体(prefabId(BALL_PREFAB))
-        const ball = balls[0]
-
-        if (bool(mainIdx === 0.0)) {
-          if (bool(row === 0.0)) f.设置自定义变量(ball, '_debugFlash0', 1.0, true)
-          else if (bool(row === 1.0)) f.设置自定义变量(ball, '_debugFlash1', 1.0, true)
-          else if (bool(row === 2.0)) f.设置自定义变量(ball, '_debugFlash4', 1.0, true)
-        } else if (bool(mainIdx === 1.0)) {
-          if (bool(row === 0.0)) f.设置自定义变量(ball, '_debugFlash8', 1.0, true)
-          else if (bool(row === 1.0)) f.设置自定义变量(ball, '_debugFlash9', 1.0, true)
-          else if (bool(row === 2.0)) f.设置自定义变量(ball, '_debugFlash10', 1.0, true)
-          else if (bool(row === 3.0)) f.设置自定义变量(ball, '_debugFlash11', 1.0, true)
-          else if (bool(row === 4.0)) f.设置自定义变量(ball, '_debugFlash12', 1.0, true)
-        } else if (bool(mainIdx === 2.0)) {
-          if (bool(row === 0.0)) f.设置自定义变量(ball, '_debugFlash3', 1.0, true)
-          else if (bool(row === 1.0)) f.设置自定义变量(ball, '_debugFlash7', 1.0, true)
-        } else if (bool(mainIdx === 3.0)) {
-          if (bool(row === 0.0)) f.设置自定义变量(ball, '_debugFlash2', 1.0, true)
-          else if (bool(row === 1.0)) f.设置自定义变量(ball, '_debugFlash5', 1.0, true)
-          else if (bool(row === 2.0)) f.设置自定义变量(ball, '_debugFlash6', 1.0, true)
+    switch (btnId) {
+      case 1073742328n: // 上（循环）
+        newRow = bool(row > 0n) ? (row - 1n) : maxRow
+        break
+      case 1073742329n: // 下（循环）
+        newRow = bool(row < maxRow) ? (row + 1n) : 0n
+        break
+      case 1073742330n: // 左：返回上级，保存子光标
+        switch (mainIdx) {
+          case 0n: newSub0 = row; break
+          case 1n: newSub1 = row; break
+          case 2n: newSub2 = row; break
+          case 3n: newSub3 = row; break
         }
-      }
+        newCol = 0n
+        newRow = mainIdx
+        break
+      case 1073742331n: // 右：进入子菜单，恢复子光标
+        newMainIdx = row
+        newCol = 1n
+        switch (row) {
+          case 0n: newRow = sub0; break
+          case 1n: newRow = sub1; break
+          case 2n: newRow = sub2; break
+          case 3n: newRow = sub3; break
+          default: newRow = 0n; break
+        }
+        break
+      case 1073742335n: // 空格 → 确认选中
+        if (col === 1n) {
+          const balls = f.获取场上指定元件ID的实体(prefabId(_BALL_PREFAB))
+          const ball = balls[0]
+          // 确认信号（消费者监听此变量变化）
+          newConfirm = confirm + 1n
+          f.设置自定义变量(ball, '_menuConfirm', newConfirm, true)
+          // 附带数据
+          f.设置自定义变量(ball, '_menuResult', mainIdx * 10n + row, true)
+          f.设置自定义变量(ball, '_menuResultMain', col1Text(mainIdx), true)
+          f.设置自定义变量(ball, '_menuResultSub', subText(mainIdx, row), true)
+        }
+        break
     }
 
     // 写回状态
     f.设置自定义变量(self, '_menuRow', newRow)
     f.设置自定义变量(self, '_menuCol', newCol)
     f.设置自定义变量(self, '_menuMainIdx', newMainIdx)
+    f.设置自定义变量(self, '_menuConfirm', newConfirm)
+    f.设置自定义变量(self, '_menuSubRow0', newSub0)
+    f.设置自定义变量(self, '_menuSubRow1', newSub1)
+    f.设置自定义变量(self, '_menuSubRow2', newSub2)
+    f.设置自定义变量(self, '_menuSubRow3', newSub3)
 
     // ===== 渲染 =====
 
-    // 字段1：第一列前缀（* = 选中行+col=0）
-    const f1r0 = bool(bool(newRow === 0.0) && bool(newCol === 0.0)) ? '*' : ' '
-    const f1r1 = bool(bool(newRow === 1.0) && bool(newCol === 0.0)) ? '*' : ' '
-    const f1r2 = bool(bool(newRow === 2.0) && bool(newCol === 0.0)) ? '*' : ' '
-    const f1r3 = bool(bool(newRow === 3.0) && bool(newCol === 0.0)) ? '*' : ' '
-    const f1r4 = bool(bool(newRow === 4.0) && bool(newCol === 0.0)) ? '*' : ' '
-    f.设置自定义变量(stage, '_menu_fld1', list('str', [f1r0, f1r1, f1r2, f1r3, f1r4]))
-
-    // 字段2：第一列内容（永远不变）
+    f.设置自定义变量(stage, '_menu_fld1', list('str', [
+      bool(bool(newRow === 0n) && bool(newCol === 0n)) ? '*' : ' ',
+      bool(bool(newRow === 1n) && bool(newCol === 0n)) ? '*' : ' ',
+      bool(bool(newRow === 2n) && bool(newCol === 0n)) ? '*' : ' ',
+      bool(bool(newRow === 3n) && bool(newCol === 0n)) ? '*' : ' ',
+      bool(bool(newRow === 4n) && bool(newCol === 0n)) ? '*' : ' ',
+    ]))
     f.设置自定义变量(stage, '_menu_fld2', list('str', COL1))
-
-    // 字段3：第二列前缀（* = 选中行+col=1）
-    const f3r0 = bool(bool(newRow === 0.0) && bool(newCol === 1.0)) ? '*' : ' '
-    const f3r1 = bool(bool(newRow === 1.0) && bool(newCol === 1.0)) ? '*' : ' '
-    const f3r2 = bool(bool(newRow === 2.0) && bool(newCol === 1.0)) ? '*' : ' '
-    const f3r3 = bool(bool(newRow === 3.0) && bool(newCol === 1.0)) ? '*' : ' '
-    const f3r4 = bool(bool(newRow === 4.0) && bool(newCol === 1.0)) ? '*' : ' '
-    f.设置自定义变量(stage, '_menu_fld3', list('str', [f3r0, f3r1, f3r2, f3r3, f3r4]))
-
-    // 字段4：第二列内容（取决于 mainIdx）
-    let f4r0 = ''; let f4r1 = ''; let f4r2 = ''; let f4r3 = ''; let f4r4 = ''
-    if (bool(newMainIdx === 0.0)) {
-      f4r0 = '单步完整'; f4r1 = '恢复运行'; f4r2 = '慢速切换'; f4r3 = ''; f4r4 = ''
-    } else if (bool(newMainIdx === 1.0)) {
-      f4r0 = '强制静止'; f4r1 = '强制滚动'; f4r2 = '强制滑动'; f4r3 = '强制空中'; f4r4 = '强制锁定'
-    } else if (bool(newMainIdx === 2.0)) {
-      f4r0 = '打印诊断'; f4r1 = '守卫评估'; f4r2 = ''; f4r3 = ''; f4r4 = ''
-    } else if (bool(newMainIdx === 3.0)) {
-      f4r0 = '重置足球'; f4r1 = '单步转移'; f4r2 = '单步物理'; f4r3 = ''; f4r4 = ''
-    }
-    f.设置自定义变量(stage, '_menu_fld4', list('str', [f4r0, f4r1, f4r2, f4r3, f4r4]))
+    f.设置自定义变量(stage, '_menu_fld3', list('str', [
+      bool(bool(newRow === 0n) && bool(newCol === 1n)) ? '*' : ' ',
+      bool(bool(newRow === 1n) && bool(newCol === 1n)) ? '*' : ' ',
+      bool(bool(newRow === 2n) && bool(newCol === 1n)) ? '*' : ' ',
+      bool(bool(newRow === 3n) && bool(newCol === 1n)) ? '*' : ' ',
+      bool(bool(newRow === 4n) && bool(newCol === 1n)) ? '*' : ' ',
+    ]))
+    f.设置自定义变量(stage, '_menu_fld4', list('str', submenuContent(newMainIdx)))
   })

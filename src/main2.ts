@@ -86,6 +86,7 @@ g.server({
     f.设置自定义变量(self, '_debugFlash10', 0.0) // 强制滑动
     f.设置自定义变量(self, '_debugFlash11', 0.0) // 强制空中
     f.设置自定义变量(self, '_debugFlash12', 0.0) // 强制锁定
+    f.设置自定义变量(self, '_menuResult', 0n) // 菜单选择结果（mainIdx*5+row）
 
     // 启动 motionTick 循环定时器（120ms 间隔）
     f.启动定时器(self, 'motionTick', true, [0.12])
@@ -559,19 +560,23 @@ g.server({
   const isFlash10 = bool(name == '_debugFlash10')
   const isFlash11 = bool(name == '_debugFlash11')
   const isFlash12 = bool(name == '_debugFlash12')
+  const isConfirm = bool(name == '_menuConfirm')
+  const noFlash0 = bool(name != '_debugFlash0')
+  const noFlash1 = bool(name != '_debugFlash1')
+  const noFlash2 = bool(name != '_debugFlash2')
+  const noFlash3 = bool(name != '_debugFlash3')
+  const noFlash4 = bool(name != '_debugFlash4')
+  const noFlash5 = bool(name != '_debugFlash5')
+  const noFlash6 = bool(name != '_debugFlash6')
+  const noFlash7 = bool(name != '_debugFlash7')
+  const noFlash8 = bool(name != '_debugFlash8')
+  const noFlash9 = bool(name != '_debugFlash9')
+  const noFlash10 = bool(name != '_debugFlash10')
+  const noFlash11 = bool(name != '_debugFlash11')
+  const noFlash12 = bool(name != '_debugFlash12')
+  const noConfirm = bool(name != '_menuConfirm')
   if (
-    bool(
-      !bool(
-        isFlash0 ||
-        bool(
-          isFlash1 ||
-          bool(
-            isFlash2 ||
-            bool(isFlash3 || bool(isFlash4 || bool(isFlash5 || bool(isFlash6 || bool(isFlash7 || bool(isFlash8 || bool(isFlash9 || bool(isFlash10 || bool(isFlash11 || isFlash12)))))))))
-          )
-        )
-      )
-    )
+    bool(noFlash0 && noFlash1 && noFlash2 && noFlash3 && noFlash4 && noFlash5 && noFlash6 && noFlash7 && noFlash8 && noFlash9 && noFlash10 && noFlash11 && noFlash12 && noConfirm)
   ) {
     return
   }
@@ -668,5 +673,23 @@ g.server({
     f.设置自定义变量(self, 'distFromLocker', 0.0, true)
     f.设置自定义变量(self, '状态', S_LOCK, true)
     f.恢复定时器(self, 'motionTick')
+  } else if (isConfirm) {
+    // == 菜单确认：监听 _menuConfirm 变化，读 _menuResult 解码 ==
+    const result = f.获取自定义变量(self, '_menuResult').asType('int')
+    switch (result) {
+      case 0n:  f.设置自定义变量(self, '_debugFlash0', 1.0, true); break   // 运行控制→单步完整
+      case 1n:  f.设置自定义变量(self, '_debugFlash1', 1.0, true); break   // 运行控制→恢复运行
+      case 2n:  f.设置自定义变量(self, '_debugFlash4', 1.0, true); break   // 运行控制→慢速切换
+      case 10n: f.设置自定义变量(self, '_debugFlash8', 1.0, true); break   // 状态跳转→强制静止
+      case 11n: f.设置自定义变量(self, '_debugFlash9', 1.0, true); break   // 状态跳转→强制滚动
+      case 12n: f.设置自定义变量(self, '_debugFlash10', 1.0, true); break  // 状态跳转→强制滑动
+      case 13n: f.设置自定义变量(self, '_debugFlash11', 1.0, true); break  // 状态跳转→强制空中
+      case 14n: f.设置自定义变量(self, '_debugFlash12', 1.0, true); break  // 状态跳转→强制锁定
+      case 20n: f.设置自定义变量(self, '_debugFlash3', 1.0, true); break   // 信息诊断→打印诊断
+      case 21n: f.设置自定义变量(self, '_debugFlash7', 1.0, true); break   // 信息诊断→守卫评估
+      case 30n: f.设置自定义变量(self, '_debugFlash2', 1.0, true); break   // 其他操作→重置足球
+      case 31n: f.设置自定义变量(self, '_debugFlash5', 1.0, true); break   // 其他操作→单步转移
+      case 32n: f.设置自定义变量(self, '_debugFlash6', 1.0, true); break   // 其他操作→单步物理
+    }
   }
 })

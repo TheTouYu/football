@@ -78,6 +78,46 @@
 
 > **关键区别**：`Math.*` 在 server scope 内自动编译为 GIA 节点；`vec3()` 是全局值构造函数（仅接受字面量）；`f.创建三维向量(x,y,z)` 是节点图 API（接受运行时变量）。三者不可混用。
 
+### 1.5 类型映射与常见编译错误
+
+#### 类型映射
+
+| TS 类型 | 节点图类型 | 说明 |
+|---------|-----------|------|
+| `number` | float | 浮点数 |
+| `bigint` | int | 整数，推荐用 `123n` 后缀 |
+| `string` | str | 字符串 |
+
+列表/字典元素必须同类型。
+
+#### 全局辅助函数（补充 1.4）
+
+| 函数 | 说明 |
+|------|------|
+| `raw(expr)` | 保留 JS 语义，编译器不做节点图转换。用于绕过编译器限制 |
+| `int(123)` | 显式声明整数字面量，但推荐使用 `123n` |
+| `idx(x)` | 帮助 bigint/IntValue 索引通过 TS 类型检查。**仅类型检查用**，不改变节点图语义。可直接用 ESLint 自动修复 |
+| `vec3([x, y, z])` | 构造 vec3 字面量。多数情况直接 `[x,y,z]` 可自动推断，`vec3()` 主要用于列表场景消除歧义 |
+
+#### 常见编译错误速查
+
+| 错误信息 | 原因 | 解决 |
+|---------|------|------|
+| `invalid value type` | 传入了不支持的值类型（如 entity 直接给 getEntityLocationAndRotation） | 检查值类型，entity 需通过 `getCorrespondingValueFromList` 获取 |
+| `Generic parameter not matched` | 泛型参数不匹配（如 `+` 用于 str 拼接） | 字符串不用 `+`，用 `list('str', [...])` 拼装列表 |
+| `switch case expression must be an integer literal` | switch 的 case 必须用整数**字面量**（不能用变量） | 用 `case 123n:` 而非 `case MY_CONST:` |
+| `switch fallthrough with body is not supported` | case 块最后必须显式 break/return/continue | 加 `break` |
+| `setTimeout/setInterval callback must be a function` | setTimeout 参数不是顶层函数 | 改用 `f.启动定时器` 替代 setTimeout |
+
+#### TS 插件提示
+
+若 VSCode 中仍见 `TS2538` 错误（bigint 不可索引），配置：
+```json
+"typescript.tsdk": "node_modules/typescript/lib",
+"typescript.enablePromptUseWorkspaceTsdk": true
+```
+若提示为"警告"而非"错误"，表示项目 TS 插件已生效，可按需禁用 `gsts/bigint-index-in-server` 规则。
+
 ---
 
 ## 2. 架构约束
