@@ -1,6 +1,9 @@
 // menu_system.ts — 交互式二级菜单系统（可复用模块）
 // v1: 5行×2列 二级菜单，通过界面控件（上下左右空格）导航
 //
+// 挂载：元件7 实体（事件由角色实体的 Menu_按键转发 转发至此，无需守卫）
+// 渲染目标：stage 上 4 个 str_list 变量（_menu_fld1~4）
+//
 // ===== 接入指南 =====
 // 1. 改底部「菜单内容定义」区的文字
 // 2. 改「渲染配置」区的目标实体和变量名前缀
@@ -8,8 +11,8 @@
 // 4. 消费者监听 ball._menuConfirm 变化 → 读 _menuResult* 数据 → 分派
 // 5. 分配新节点图 ID
 //
-// ===== 输出变量（写在 _RESULT_TARGET 实体上）=====
-// _menuConfirm (int) — 每次确认递增，消费者监听此变量变化事件
+// ===== 输出变量（写在 self=元件7 上，由桥接图 menu_bridge.ts 监听并转发到球）=====
+// _menuConfirm (int) — 每次确认递增
 // _menuResult  (int) — 编码位置 = mainIdx*10 + row
 // _menuResultMain (str) — 主菜单文字
 // _menuResultSub  (str) — 子菜单文字
@@ -30,9 +33,6 @@ import { g } from 'genshin-ts-touyu/runtime/core'
 // ============================================================
 
 /** 渲染变量名前缀（不需要改） */
-
-// 足球元件 ID
-const _BALL_PREFAB = 1077936262
 
 // ============================================================
 // 可配置常量
@@ -59,77 +59,50 @@ const SUB3_MAX_ROW = 2n
 const COL1: string[] = ['运行控制', '状态跳转', '信息诊断', '其他操作', '']
 
 /** 子菜单内容表 */
-const SUB_0: string[] = ['单步完整',    '恢复运行', '慢速切换', '', '']
-const SUB_1: string[] = ['强制静止',    '强制滚动', '强制滑动', '强制空中', '强制锁定']
-const SUB_2: string[] = ['打印诊断',    '守卫评估', '',         '',      '']
-const SUB_3: string[] = ['重置足球',    '单步转移', '单步物理', '',      '']
+const SUB_0: string[] = ['单步完整', '恢复运行', '慢速切换', '', '']
+const SUB_1: string[] = ['强制静止', '强制滚动', '强制滑动', '强制空中', '强制锁定']
+const SUB_2: string[] = ['打印诊断', '守卫评估', '', '', '']
+const SUB_3: string[] = ['重置足球', '单步转移', '单步物理', '', '']
 
 // ============================================================
-// 辅助函数
+// gstsServer 查表函数（加前缀后编译器可正确生成跨函数调用节点）
+// 约束：单一 return 表达式，参数为普通标识符（不能是对象/解构）
 // ============================================================
-function submenuContent(mainIdx: bigint): string[] {
-  switch (mainIdx) {
-    case 0n: return SUB_0
-    case 1n: return SUB_1
-    case 2n: return SUB_2
-    case 3n: return SUB_3
-    default:  return ['', '', '', '', '']
-  }
+
+function gstsServerSubmenuContent(mainIdx: bigint): string[] {
+  return mainIdx === 0n ? SUB_0
+    : mainIdx === 1n ? SUB_1
+    : mainIdx === 2n ? SUB_2
+    : mainIdx === 3n ? SUB_3
+    : ['', '', '', '', '']
 }
 
-function submenuMaxRow(mainIdx: bigint): bigint {
-  switch (mainIdx) {
-    case 0n: return SUB0_MAX_ROW
-    case 1n: return SUB1_MAX_ROW
-    case 2n: return SUB2_MAX_ROW
-    case 3n: return SUB3_MAX_ROW
-    default:  return 0n
-  }
+function gstsServerSubmenuMaxRow(mainIdx: bigint): bigint {
+  return mainIdx === 0n ? SUB0_MAX_ROW
+    : mainIdx === 1n ? SUB1_MAX_ROW
+    : mainIdx === 2n ? SUB2_MAX_ROW
+    : mainIdx === 3n ? SUB3_MAX_ROW
+    : 0n
 }
 
-function col1Text(mainIdx: bigint): string {
-  switch (mainIdx) {
-    case 0n: return '运行控制'
-    case 1n: return '状态跳转'
-    case 2n: return '信息诊断'
-    case 3n: return '其他操作'
-    default:  return ''
-  }
+function gstsServerCol1Text(mainIdx: bigint): string {
+  return mainIdx === 0n ? '运行控制'
+    : mainIdx === 1n ? '状态跳转'
+    : mainIdx === 2n ? '信息诊断'
+    : mainIdx === 3n ? '其他操作'
+    : ''
 }
 
-function subText(mainIdx: bigint, row: bigint): string {
-  switch (mainIdx) {
-    case 0n:
-      switch (row) {
-        case 0n: return '单步完整'
-        case 1n: return '恢复运行'
-        case 2n: return '慢速切换'
-      }
-      break
-    case 1n:
-      switch (row) {
-        case 0n: return '强制静止'
-        case 1n: return '强制滚动'
-        case 2n: return '强制滑动'
-        case 3n: return '强制空中'
-        case 4n: return '强制锁定'
-      }
-      break
-    case 2n:
-      switch (row) {
-        case 0n: return '打印诊断'
-        case 1n: return '守卫评估'
-      }
-      break
-    case 3n:
-      switch (row) {
-        case 0n: return '重置足球'
-        case 1n: return '单步转移'
-        case 2n: return '单步物理'
-      }
-      break
-  }
-  return ''
+function gstsServerSubText(mainIdx: bigint, row: bigint): string {
+  return mainIdx === 0n
+    ? (row === 0n ? '单步完整' : row === 1n ? '恢复运行' : row === 2n ? '慢速切换' : '')
+    : mainIdx === 1n
+    ? (row === 0n ? '强制静止' : row === 1n ? '强制滚动' : row === 2n ? '强制滑动' : row === 3n ? '强制空中' : row === 4n ? '强制锁定' : '')
+    : mainIdx === 2n
+    ? (row === 0n ? '打印诊断' : row === 1n ? '守卫评估' : '')
+    : mainIdx === 3n
+    ? (row === 0n ? '重置足球' : row === 1n ? '单步转移' : row === 2n ? '单步物理' : '')
+    : ''
 }
 
 // ============================================================
@@ -169,8 +142,7 @@ g.server({
     f.设置自定义变量(stage, '_menu_fld4', list('str', SUB_0))
   })
   .on('界面控件组触发时', (evt, f) => {
-    if (!bool(f.equal(evt.eventSourceEntity, self))) return
-
+    // 事件已由 Menu_按键转发 (ID 1073742448) 过滤后转发至此，无需守卫
     const btnId = evt.uiControlGroupIndex
     const row = f.获取自定义变量(self, '_menuRow').asType('int')
     const col = f.获取自定义变量(self, '_menuCol').asType('int')
@@ -190,16 +162,18 @@ g.server({
     let newSub2 = sub2
     let newSub3 = sub3
 
-    const maxRow = bool(col === 0n) ? MAIN_MAX_ROW : submenuMaxRow(mainIdx)
+    const maxRow = bool(col === 0n) ? MAIN_MAX_ROW : gstsServerSubmenuMaxRow(mainIdx)
 
     switch (btnId) {
-      case 1073742328n: // 上（循环）
+      case 1073742339n: // 上（循环）
         newRow = bool(row > 0n) ? (row - 1n) : maxRow
+        if (col === 0n) newMainIdx = newRow
         break
-      case 1073742329n: // 下（循环）
+      case 1073742340n: // 下（循环）
         newRow = bool(row < maxRow) ? (row + 1n) : 0n
+        if (col === 0n) newMainIdx = newRow
         break
-      case 1073742330n: // 左：返回上级，保存子光标
+      case 1073742341n: // 左：返回上级，保存子光标
         switch (mainIdx) {
           case 0n: newSub0 = row; break
           case 1n: newSub1 = row; break
@@ -209,7 +183,7 @@ g.server({
         newCol = 0n
         newRow = mainIdx
         break
-      case 1073742331n: // 右：进入子菜单，恢复子光标
+      case 1073742342n: // 右：进入子菜单，恢复子光标
         newMainIdx = row
         newCol = 1n
         switch (row) {
@@ -220,17 +194,13 @@ g.server({
           default: newRow = 0n; break
         }
         break
-      case 1073742335n: // 空格 → 确认选中
+      case 1073742343n: // 空格 → 确认选中（结果写在 self=元件7，桥接图监听后转发到球）
         if (col === 1n) {
-          const balls = f.获取场上指定元件ID的实体(prefabId(_BALL_PREFAB))
-          const ball = balls[0]
-          // 确认信号（消费者监听此变量变化）
           newConfirm = confirm + 1n
-          f.设置自定义变量(ball, '_menuConfirm', newConfirm, true)
-          // 附带数据
-          f.设置自定义变量(ball, '_menuResult', mainIdx * 10n + row, true)
-          f.设置自定义变量(ball, '_menuResultMain', col1Text(mainIdx), true)
-          f.设置自定义变量(ball, '_menuResultSub', subText(mainIdx, row), true)
+          f.设置自定义变量(self, '_menuConfirm', newConfirm, true)
+          f.设置自定义变量(self, '_menuResult', mainIdx * 10n + row, true)
+          f.设置自定义变量(self, '_menuResultMain', gstsServerCol1Text(mainIdx), true)
+          f.设置自定义变量(self, '_menuResultSub', gstsServerSubText(mainIdx, row), true)
         }
         break
     }
@@ -262,5 +232,13 @@ g.server({
       bool(bool(newRow === 3n) && bool(newCol === 1n)) ? '*' : ' ',
       bool(bool(newRow === 4n) && bool(newCol === 1n)) ? '*' : ' ',
     ]))
-    f.设置自定义变量(stage, '_menu_fld4', list('str', submenuContent(newMainIdx)))
+    // 字段4：第二列内容（内联 submenuContent — gstsServer 返回 str_list 不支持）
+    let f4r0 = ''; let f4r1 = ''; let f4r2 = ''; let f4r3 = ''; let f4r4 = ''
+    switch (newMainIdx) {
+      case 0n: f4r0 = '单步完整';    f4r1 = '恢复运行'; f4r2 = '慢速切换'; f4r3 = '';     f4r4 = '';     break
+      case 1n: f4r0 = '强制静止';    f4r1 = '强制滚动'; f4r2 = '强制滑动'; f4r3 = '强制空中'; f4r4 = '强制锁定'; break
+      case 2n: f4r0 = '打印诊断';    f4r1 = '守卫评估'; f4r2 = '';         f4r3 = '';     f4r4 = '';     break
+      case 3n: f4r0 = '重置足球';    f4r1 = '单步转移'; f4r2 = '单步物理'; f4r3 = '';     f4r4 = '';     break
+    }
+    f.设置自定义变量(stage, '_menu_fld4', list('str', [f4r0, f4r1, f4r2, f4r3, f4r4]))
   })

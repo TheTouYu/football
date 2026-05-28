@@ -41,3 +41,35 @@ g.server({
 // 菜单交互已迁移至 menu_system.ts (ID 1073742447)
 // 此 ID (1073742446) 保留，不挂载任何逻辑
 // ============================================================
+
+// ============================================================
+// Graph 3: Menu_按键转发 (ID 1073742448, 挂载角色实体)
+// 职责：过滤菜单按钮事件，转发给元件7实体
+//       只转发上下左右空格 5 个按钮，其余忽略
+// ============================================================
+
+const MENU_BTN_UP    = 1073742339n
+const MENU_BTN_DOWN  = 1073742340n
+const MENU_BTN_LEFT  = 1073742341n
+const MENU_BTN_RIGHT = 1073742342n
+const MENU_BTN_SPACE = 1073742343n
+
+g.server({
+  id: 1073742448,
+  name: 'Menu_按键转发',
+  lang: 'zh'
+})
+  .on('界面控件组触发时', (evt, f) => {
+    const btnId = evt.uiControlGroupIndex
+
+    // 只转发菜单按钮
+    if (bool(
+      btnId === MENU_BTN_UP   || btnId === MENU_BTN_DOWN ||
+      btnId === MENU_BTN_LEFT || btnId === MENU_BTN_RIGHT ||
+      btnId === MENU_BTN_SPACE
+    )) {
+      const entities = f.获取场上指定元件ID的实体(prefabId(1077936280))
+      const menuEntity = entities[0]
+      f.转发事件(menuEntity)
+    }
+  })
